@@ -1,7 +1,7 @@
 # 璀璨宝石：宝可梦（离线原型）
 
-**操作全部在命令行；可视化是“对局结束后生成 HTML，用浏览器打开回放”。**
-没有常驻 GUI、Godot 实时界面、联网或 PvP。
+**命令行负责对局与回测；可视化有两种：对局结束后用浏览器打开 HTML 回放，或用 Godot 打开 `game/` 载入同一份回放 JSON。**
+没有联网或 PvP；Godot 侧是只读回放界面，不接管实时对局。
 
 三种用法：
 
@@ -171,7 +171,45 @@ HTML 是单个自包含文件，没有服务器、CDN 或联网请求。支持�
 
 热座模式不产出回放；需要可视化请使用 PvE 或 `bot-vs-bot`。
 
+## 5. Godot 回放可视化
+
+`game/` 是独立的 Godot 4.6 工程：读取 `bot-vs-bot` / `pve` 写出的同一份回放 JSON，逐动作绘制场上牌、供应区、玩家与事件。界面只读，不建游戏、不改规则；私密信息按后端约定处理——每帧只显示执行动作玩家的保留牌，其他玩家的保留牌只显示数量。
+
+在仓库根目录启动（本工作副本的 Godot 4.6 可执行文件在仓库上一级）：
+
+```bash
+../Godot_v4.6.1-stable_win64.exe --path game
+```
+
+`godot` 已在 `PATH` 时用 `godot --path game`。
+
+- 首次打开会自动载入仓库 `tmp/` 下最新的 `*.json`；没有回放时显示空状态，点「打开回放…」选文件。
+- 载入指定回放：
+
+  ```bash
+  ../Godot_v4.6.1-stable_win64.exe --path game -- tmp/bot-42-2p.json
+  ```
+
+  也可以用环境变量 `SPLENDOR_REPLAY=tmp/bot-42-2p.json`。
+- 快捷键与控件：
+
+  | 操作 | 说明 |
+  |---|---|
+  | `←` / `→` | 上一帧 / 下一帧 |
+  | `空格` / `P` | 自动播放 / 暂停 |
+  | `Home` / `End` | 首帧 / 末帧 |
+  | 进度条 | 任意跳转 |
+  | 速度 | 慢 / 中 / 快 / 极快 |
+  | 打开回放… / 重新载入 | 选择任意回放 JSON / 重读当前文件 |
+  | 悬停场上牌 | 显示完整卡牌 tooltip |
+  | 悬停玩家面板 | 显示该玩家的完整捕捉 / 保留列表 |
+
+- 横幅：终局显示胜者与分数；规则僵局显示无胜者说明。
+- Godot 的导入缓存 `game/.godot/` 已被 `.gitignore` 忽略；`icon.svg.import` 与脚本 `.uid` 随仓库提交。
+
 ## 验证
+
+在 `backend/` 下：
 
 ```bash
 cargo test --workspace
@@ -179,4 +217,14 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```
 
-更详细的模块与设计说明见 [`backend/README.md`](backend/README.md)。
+Godot 回放冒烟（在仓库根目录；退出码 0 表示通过）：
+
+```bash
+SPLENDOR_SMOKE=1 SPLENDOR_REPLAY=tmp/bot-42-2p.json \
+  ../Godot_v4.6.1-stable_win64_console.exe --headless --path game
+```
+
+冒烟会载入回放、逐帧渲染、检查 5 行牌 / 玩家面板 / 按钮边界 / 播放推进 / 终局横幅 / 布局尺寸 / 中文字形。
+
+更详细的模块与设计说明见 [`backend/README.md`](backend/README.md)；Godot 工程结构见 [`game/README.md`](game/README.md)。
+

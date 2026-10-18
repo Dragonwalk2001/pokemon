@@ -7,6 +7,9 @@ target/
 # Temporary workspace files
 /tmp/
 
+# Godot import cache / editor state (game/ is an independent Godot project)
+/game/.godot/
+
 # Compiler artifacts that can appear outside target/
 *.pdb
 *.rlib

@@ -1,0 +1,236 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/game/board_view.gd" id="2_board"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0627451, 0.0745098, 0.101961, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="Root" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TopBar" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Margin/Root/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.909804, 0.929412, 0.968627, 1)
+theme_override_font_sizes/font_size = 24
+text = "璀璨宝石 · 宝可梦"
+
+[node name="Meta" type="Label" parent="Margin/Root/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 13
+text = "未加载回放"
+vertical_alignment = 1
+text_overrun_behavior = 3
+
+[node name="OpenButton" type="Button" parent="Margin/Root/TopBar"]
+layout_mode = 2
+text = "打开回放…"
+
+[node name="ReloadButton" type="Button" parent="Margin/Root/TopBar"]
+layout_mode = 2
+text = "重新载入"
+
+[node name="Timeline" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PrevButton" type="Button" parent="Margin/Root/Timeline"]
+layout_mode = 2
+text = "◀ 上一步"
+
+[node name="PlayButton" type="Button" parent="Margin/Root/Timeline"]
+layout_mode = 2
+text = "▶ 自动播放"
+
+[node name="NextButton" type="Button" parent="Margin/Root/Timeline"]
+layout_mode = 2
+text = "下一步 ▶"
+
+[node name="TimelineSlider" type="HSlider" parent="Margin/Root/Timeline"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 0.0
+step = 1.0
+
+[node name="FrameLabel" type="Label" parent="Margin/Root/Timeline"]
+custom_minimum_size = Vector2(76, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "0 / 0"
+horizontal_alignment = 1
+
+[node name="PhaseLabel" type="Label" parent="Margin/Root/Timeline"]
+custom_minimum_size = Vector2(112, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.486275, 0.611765, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "—"
+
+[node name="SpeedButton" type="Button" parent="Margin/Root/Timeline"]
+layout_mode = 2
+text = "速度：中"
+
+[node name="BannerPanel" type="PanelContainer" parent="Margin/Root"]
+visible = false
+layout_mode = 2
+
+[node name="BannerLabel" type="Label" parent="Margin/Root/BannerPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 2
+
+[node name="Body" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="Left" type="VBoxContainer" parent="Margin/Root/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="BoardPanel" type="PanelContainer" parent="Margin/Root/Body/Left"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Left/BoardPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Left/BoardPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "场上牌"
+
+[node name="BoardView" type="Control" parent="Margin/Root/Body/Left/BoardPanel/VBox"]
+custom_minimum_size = Vector2(0, 360)
+layout_mode = 2
+size_flags_vertical = 3
+script = ExtResource("2_board")
+
+[node name="PlayersPanel" type="PanelContainer" parent="Margin/Root/Body/Left"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Left/PlayersPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Left/PlayersPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "玩家"
+
+[node name="PlayersRow" type="HBoxContainer" parent="Margin/Root/Body/Left/PlayersPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Right" type="VBoxContainer" parent="Margin/Root/Body"]
+custom_minimum_size = Vector2(340, 0)
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SupplyPanel" type="PanelContainer" parent="Margin/Root/Body/Right"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Right/SupplyPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Right/SupplyPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "供应区"
+
+[node name="SupplyGrid" type="GridContainer" parent="Margin/Root/Body/Right/SupplyPanel/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+columns = 3
+
+[node name="ActionPanel" type="PanelContainer" parent="Margin/Root/Body/Right"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Right/ActionPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "最近动作"
+
+[node name="ActionMain" type="Label" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.941176, 0.756863, 0.352941, 1)
+theme_override_font_sizes/font_size = 17
+text = "打开一个回放开始"
+autowrap_mode = 2
+
+[node name="ActionActor" type="Label" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "支持 tmp/*.json 与任意 CLI 导出的 replay JSON"
+autowrap_mode = 2
+
+[node name="Events" type="RichTextLabel" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = false
+scroll_following = true
+selection_enabled = true
+
+[node name="FileDialog" type="FileDialog" parent="."]
+title = "打开回放 JSON"
+size = Vector2i(900, 600)
+visible = false
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.json ; 回放 JSON")
+
+[node name="PlayTimer" type="Timer" parent="."]
+wait_time = 1.0
+

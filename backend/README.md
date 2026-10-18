@@ -1,6 +1,6 @@
 # 璀璨宝石：宝可梦 — Rust 后端
 
-当前形态：**规则引擎库 + 交互式 CLI + 离线 bot / HTML 回放**。HTTP / WebSocket 服务尚未实现，不含联网与 PvP。
+当前形态：**规则引擎库 + 交互式 CLI + 离线 bot / HTML 回放**；同仓库 `game/` 提供只读的 Godot 回放前端。HTTP / WebSocket 服务尚未实现，不含联网与 PvP。
 
 ## 目录
 
@@ -30,7 +30,7 @@ backend/
         └── tests/cli.rs             # CLI 端到端冒烟测试
 ```
 
-数据源是仓库根目录的 `data/cards.csv`（编译期 `include_str!` 嵌入）与 `data/rules.md`。
+数据源是仓库根目录的 `data/cards.csv`（编译期 `include_str!` 嵌入）与 `data/rules.md`。仓库根的 `game/` 是独立 Godot 4.6 工程，只读回放 JSON，不属于 Rust workspace。
 
 ## 运行
 
@@ -109,7 +109,8 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 - **回放结构**：`Replay { version, seed, players, controllers, frames, result, stalemate }`。`frames[0]` 是开局视图，之后每帧保存 `actor + Action + GameView + 本步事件文本`。为避免整局日志在每帧重复，帧内 `view.log` 只保留本步新增事件。
 - **规则僵局**：3 人局可能把普通球全部持有到供应区只剩大师球，此时若当前玩家无牌可捕捉，引擎没有合法主行动且规则未定义 pass。回放以 `stalemate: true`、无胜者收尾，不新增动作、不改变规则语义。
 - **输出位置**：`pve` / `bot-vs-bot` 默认写 `tmp/pve-<seed>-<n>p.*` 或 `tmp/bot-<seed>-<n>p.*`；`--replay` / `--html` 可覆盖。`tmp/` 已被 `.gitignore` 忽略。
-- **HTML 回放**：单个文件内嵌全部 CSS / JS / JSON，不引用 CDN、字体或图片，`file://` 直接打开。支持上一步 / 下一步 / 自动播放 / 速度 / 进度条 / 键盘方向键，展示场上牌、供应区、各玩家球与减免、分数、保留数、最近动作与终局横幅。选 HTML 而非 ratatui：无需额外终端依赖、卡片信息密度更高、可截图分享，且同一份回放 JSON 后续可直接给 Godot 使用。
+- **HTML 回放**：单个文件内嵌全部 CSS / JS / JSON，不引用 CDN、字体或图片，`file://` 直接打开。支持上一步 / 下一步 / 自动播放 / 速度 / 进度条 / 键盘方向键，展示场上牌、供应区、各玩家球与减免、分数、保留数、最近动作与终局横幅。选 HTML 而非 ratatui：无需额外终端依赖、卡片信息密度更高、可截图分享，且同一份回放 JSON 就是 `game/` Godot 前端的数据源。
+- **Godot 回放**：`game/` 是独立 Godot 4.6 工程，读取同一份回放 JSON，逐帧绘制场上牌、供应区、玩家与事件；只读界面，不改规则。启动、操作与无头冒烟命令见根 README 与 [`game/README.md`](../game/README.md)。
 
 ## 规则覆盖
 
@@ -135,4 +136,4 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 - 联网、PvP、HTTP / WebSocket 接口与房间、账号体系。
 - 搜索 / 学习型 bot（当前为启发式 + 定向改写，未做博弈搜索）。
 - 角色立牌的特殊能力（规则文档未提供角色效果数据，当前只记录进化次数用于平手判定）。
-- 卡图与 Godot 前端资源（回放 JSON 已按可复用格式输出）。
+- 卡图与音效：HTML / Godot 回放均用纯色块 + 文字绘制，无宝可梦立绘与音效。
