@@ -69,7 +69,7 @@ CARGO_HOME="$PWD/.rust/cargo" RUSTUP_HOME="$PWD/.rust/rustup" \
   -p splendor-pokemon-cli -- --players 3 --seed 42
 ```
 
-`.rust/` 缺失时需要自行安装 Rust；工具链不要放进 `tmp/`。
+`.rust/` 缺失时需要自行安装 Rust；工具链不要放进 `tmp/`。Git Bash / PowerShell 的会话级 `PATH` 写法见根 [`README.md`](../README.md) 的「环境」一节。
 
 CLI 启动后输入 `help` 查看命令。主要命令：
 

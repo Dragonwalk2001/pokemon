@@ -19,13 +19,37 @@
 cd backend
 ```
 
-如果 `cargo` 不在 PATH（本工作副本在根目录 `.rust/` 带了隔离工具链），先执行（Git Bash；PowerShell 用 `$env:CARGO_HOME` / `$env:RUSTUP_HOME`）：
+如果 `cargo` 不在 PATH（本工作副本在项目根 `.rust/` 带了隔离工具链），在 `backend/` 下执行（Git Bash）：
 
 ```bash
 export CARGO_HOME="$PWD/../.rust/cargo"
 export RUSTUP_HOME="$PWD/../.rust/rustup"
-# 然后把下面所有 cargo 换成 ../.rust/cargo/bin/cargo.exe
+export PATH="$CARGO_HOME/bin:$PATH"
+
+cargo --version   # cargo 1.99.1
 ```
+
+PowerShell 对应写法：
+
+```powershell
+$env:CARGO_HOME = "$PWD/../.rust/cargo"
+$env:RUSTUP_HOME = "$PWD/../.rust/rustup"
+$env:PATH = "$env:CARGO_HOME/bin;$env:PATH"
+
+cargo --version
+```
+
+要点：
+
+- `CARGO_HOME` 只决定 registry 与缓存位置，**不会**把 `cargo` 加进 `PATH`，必须单独把 `$CARGO_HOME/bin` 加进 `PATH`。
+- `RUSTUP_HOME` 必需：`.rust/cargo/bin/cargo.exe` 是 rustup 代理，缺它会在用户目录 `~/.rustup` 找工具链并报 `no default is configured`。
+- 以上 `export` / `$env:` 只影响当前终端会话。不要写入 `~/.bashrc`、用户级环境变量或 `setx`；`.rust/` 不随仓库分发。
+- 不想改 `PATH` 时，用显式路径调用（同样在 `backend/` 下）：
+
+  ```bash
+  CARGO_HOME="$PWD/../.rust/cargo" RUSTUP_HOME="$PWD/../.rust/rustup" \
+    ../.rust/cargo/bin/cargo.exe --version
+  ```
 
 ## 1. 启动游戏
 
