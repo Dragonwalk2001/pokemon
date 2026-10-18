@@ -1,0 +1,14 @@
+[package]
+name = "splendor-pokemon-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Interactive CLI for the Splendor: Pokemon rules engine"
+
+[[bin]]
+name = "splendor-pokemon"
+path = "src/main.rs"
+
+[dependencies]
+splendor-pokemon-core.workspace = true
+serde_json.workspace = true

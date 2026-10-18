@@ -1,0 +1,18 @@
+# Rust build artifacts (workspace target and any crate-local target)
+target/
+
+# Project-local Rust toolchain (CARGO_HOME / RUSTUP_HOME)
+/.rust/
+
+# Temporary workspace files
+/tmp/
+
+# Compiler artifacts that can appear outside target/
+*.pdb
+*.rlib
+*.rmeta
+*.d
+
+# OS noise
+.DS_Store
+Thumbs.db
