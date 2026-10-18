@@ -1,9 +1,14 @@
 extends Control
 ## 场上牌自绘视图：五行（1/2/3 阶、稀有、传说）。
 ##
-## 只负责渲染与悬停高亮，回放状态由 main.gd 通过 `set_view()` 注入。
+## 只负责渲染、悬停高亮与点击命中，回放状态由 main.gd 通过 `set_view()` 注入。
 ## 卡面以减免色为底，中央是完整名字大字，右上角分数，左下角捕捉费用；
 ## 行高足够时在右下角显示进化需求。鼠标悬停会高亮牌面并展示完整 tooltip。
+## `set_interactive(true)` 后左键发 `slot_clicked`、右键发 `slot_right_clicked`；
+## 回放界面不开启交互，行为与之前一致。
+
+signal slot_clicked(row: int, slot: int, card: Dictionary)
+signal slot_right_clicked(row: int, slot: int, card: Dictionary)
 
 const Styles := preload("res://scripts/ui/styles.gd")
 
@@ -24,6 +29,8 @@ const COMPACT_H := 72.0
 
 var _board: Dictionary = {}
 var _hover := Vector2i(-1, -1)
+var _selected := Vector2i(-1, -1)
+var _interactive := false
 var _boxes: Dictionary = {}  # Vector2i(row, slot) -> Rect2
 
 
@@ -38,9 +45,29 @@ func _ready() -> void:
 func set_view(board: Dictionary) -> void:
 	_board = board
 	_hover = Vector2i(-1, -1)
+	_selected = Vector2i(-1, -1)
 	_boxes.clear()
 	tooltip_text = ""
 	queue_redraw()
+
+
+## 交互模式：开启后左键选择、右键快捷操作；回放界面保持关闭。
+func set_interactive(enabled: bool) -> void:
+	_interactive = enabled
+	mouse_default_cursor_shape = (
+		Control.CURSOR_POINTING_HAND if enabled else Control.CURSOR_ARROW
+	)
+	queue_redraw()
+
+
+## 当前选中的 (行, 槽位)；(-1, -1) 表示无选择。
+func set_selected(key: Vector2i) -> void:
+	_selected = key
+	queue_redraw()
+
+
+func selected() -> Vector2i:
+	return _selected
 
 
 ## 当前注入的 board（冒烟测试用）。
@@ -89,6 +116,8 @@ func _draw() -> void:
 				_draw_empty_slot(font, box, compact)
 			if _hover == Vector2i(row_index, slot_index):
 				draw_style_box(Styles.border_box(Styles.COLOR_ACCENT, 2, 10), box)
+			if _selected == Vector2i(row_index, slot_index):
+				draw_style_box(Styles.border_box(Styles.COLOR_GOLD, 3, 10), box)
 
 
 func _draw_row_label(font: Font, row: Dictionary, rect: Rect2) -> void:
@@ -315,16 +344,48 @@ func _draw_empty_state() -> void:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		var found := Vector2i(-1, -1)
-		for key in _boxes:
-			var rect: Rect2 = _boxes[key]
-			if rect.has_point(event.position):
-				found = key
-				break
+		var found := _slot_at(event.position)
 		if found != _hover:
 			_hover = found
 			tooltip_text = _tooltip_for(found)
 			queue_redraw()
+		return
+	if not _interactive or not (event is InputEventMouseButton) or not event.pressed:
+		return
+	var key := _slot_at(event.position)
+	if key.x < 0:
+		return
+	var card := _card_at(key)
+	if card.is_empty():
+		return
+	if event.button_index == MOUSE_BUTTON_LEFT:
+		_selected = key
+		queue_redraw()
+		slot_clicked.emit(key.x, key.y, card)
+	elif event.button_index == MOUSE_BUTTON_RIGHT:
+		slot_right_clicked.emit(key.x, key.y, card)
+
+
+func _slot_at(position: Vector2) -> Vector2i:
+	for key in _boxes:
+		var rect: Rect2 = _boxes[key]
+		if rect.has_point(position):
+			return key
+	return Vector2i(-1, -1)
+
+
+func _card_at(key: Vector2i) -> Dictionary:
+	if key.x < 0 or key.x >= ROWS.size():
+		return {}
+	var row: Dictionary = ROWS[key.x]
+	var raw: Variant = _board.get(str(row["board_key"]), [])
+	if not (raw is Array):
+		return {}
+	var slots: Array = raw
+	if key.y < 0 or key.y >= slots.size():
+		return {}
+	var card: Variant = slots[key.y]
+	return card if card is Dictionary else {}
 
 
 func _on_mouse_exited() -> void:

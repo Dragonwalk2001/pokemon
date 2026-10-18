@@ -4,6 +4,7 @@ mod arena;
 mod bot_cmd;
 mod html;
 mod pve;
+mod serve;
 mod ui;
 
 use std::env;
@@ -19,6 +20,7 @@ fn main() -> ExitCode {
         Some("pve") => pve::run(&args[1..]),
         Some("bot-vs-bot") | Some("bots") => bot_cmd::run_bots(&args[1..]),
         Some("arena") | Some("bench") => arena::run(&args[1..]),
+        Some("serve") | Some("server") => serve::run(&args[1..]),
         Some("replay") | Some("html") => bot_cmd::run_render(&args[1..]),
         Some("--help") | Some("-h") => {
             ui::print_usage();

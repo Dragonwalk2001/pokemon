@@ -1,8 +1,14 @@
 //! CLI 端到端冒烟测试：bot-vs-bot / PvE --auto 能跑完并产出可离线打开的 HTML。
 
 use std::fs;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 use splendor_pokemon_core::{Phase, Replay};
 
@@ -182,4 +188,101 @@ fn pve_auto_finishes_and_records_replay() {
 
     let _ = fs::remove_file(json);
     let _ = fs::remove_file(html);
+}
+
+#[test]
+fn serve_accepts_http_health_and_new_game() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_splendor-pokemon"))
+        .current_dir(workspace_root())
+        .args(["serve", "--port", "0", "--idle-timeout", "10"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn serve");
+    let stdout = child.stdout.take().expect("serve stdout");
+    let child = Arc::new(Mutex::new(child));
+    let done = Arc::new(AtomicBool::new(false));
+
+    // 看门狗：启动 / 读取 / 套接字任一环节卡住时，最多 10 秒后终止子进程。
+    let watchdog = {
+        let child = Arc::clone(&child);
+        let done = Arc::clone(&done);
+        thread::spawn(move || {
+            for _ in 0..100 {
+                if done.load(Ordering::Relaxed) {
+                    return;
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+            if let Ok(mut child) = child.lock() {
+                let _ = child.kill();
+            }
+        })
+    };
+
+    let mut reader = BufReader::new(stdout);
+    let mut address = String::new();
+    for _ in 0..4 {
+        let mut line = String::new();
+        if reader.read_line(&mut line).unwrap_or(0) == 0 {
+            break;
+        }
+        if let Some(position) = line.find("http://") {
+            address = line[position..].trim().to_string();
+            break;
+        }
+    }
+    assert!(
+        address.starts_with("http://127.0.0.1:"),
+        "serve 必须打印监听地址，实际 {address:?}"
+    );
+    let port: u16 = address
+        .rsplit(':')
+        .next()
+        .and_then(|value| value.parse().ok())
+        .expect("serve port");
+
+    let new_game = r#"{"seed":9,"bots":2,"bot":"heuristic","name":"你"}"#;
+    let response = http_request(
+        port,
+        "POST /api/game/new HTTP/1.1",
+        &[("Content-Type", "application/json")],
+        new_game,
+    );
+    assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
+    assert!(response.contains("\"ok\":true"), "{response}");
+    assert!(response.contains("\"seed\":9"), "{response}");
+    assert!(
+        response.contains("\"human_turn\":true"),
+        "new game response: {response}"
+    );
+
+    let health = http_request(port, "GET /api/health HTTP/1.1", &[], "");
+    assert!(health.contains("\"ok\":true"), "{health}");
+    assert!(health.contains("splendor-pokemon"), "{health}");
+
+    done.store(true, Ordering::Relaxed);
+    let _ = child.lock().unwrap().kill();
+    let _ = child.lock().unwrap().wait();
+    let _ = watchdog.join();
+}
+
+fn http_request(port: u16, request_line: &str, headers: &[(&str, &str)], body: &str) -> String {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect serve");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .expect("read timeout");
+    let mut request = format!(
+        "{request_line}\r\nHost: 127.0.0.1\r\nConnection: close\r\nContent-Length: {}\r\n",
+        body.len()
+    );
+    for (name, value) in headers {
+        request.push_str(&format!("{name}: {value}\r\n"));
+    }
+    request.push_str("\r\n");
+    request.push_str(body);
+    stream.write_all(request.as_bytes()).expect("write request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("read response");
+    response
 }

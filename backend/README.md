@@ -1,6 +1,6 @@
 # 璀璨宝石：宝可梦 — Rust 后端
 
-当前形态：**规则引擎库 + 交互式 CLI + 离线 bot / HTML 回放**；同仓库 `game/` 提供只读的 Godot 回放前端。HTTP / WebSocket 服务尚未实现，不含联网与 PvP。
+当前形态：**规则引擎库 + 交互式 CLI + 离线 bot / HTML 回放 + 本地 JSON HTTP 服务**；同仓库 `game/` 提供只读回放与「和 AI 对战」两种 Godot 界面。HTTP 服务只监听 `127.0.0.1`，供本机 Godot 使用；不含联网、远程 PvP、房间或账号。
 
 ## 目录
 
@@ -22,6 +22,7 @@ backend/
     └── splendor-pokemon-cli/        # 对局 CLI
         ├── src/main.rs              # 子命令分发与热座对局
         ├── src/pve.rs               # 1 人 + 2–3 bot
+        ├── src/serve.rs             # 127.0.0.1 JSON HTTP 服务（Godot 对战）
         ├── src/bot_cmd.rs           # bot-vs-bot / replay 子命令
         ├── src/arena.rs              # 固定 20 种子 × 先后手互换的 40 局回测
         ├── src/html.rs              # 回放 JSON → 自包含 HTML
@@ -30,7 +31,7 @@ backend/
         └── tests/cli.rs             # CLI 端到端冒烟测试
 ```
 
-数据源是仓库根目录的 `data/cards.csv`（编译期 `include_str!` 嵌入）与 `data/rules.md`。仓库根的 `game/` 是独立 Godot 4.6 工程，只读回放 JSON，不属于 Rust workspace。
+数据源是仓库根目录的 `data/cards.csv`（编译期 `include_str!` 嵌入）与 `data/rules.md`。仓库根的 `game/` 是独立 Godot 4.6 工程，含只读回放与本地 PvE 对战场景，不属于 Rust workspace。
 
 ## 运行
 
@@ -62,6 +63,9 @@ cargo run -p splendor-pokemon-cli -- arena \
 
 # 把已有回放 JSON 重新渲染成 HTML
 cargo run -p splendor-pokemon-cli -- replay tmp/replay.json --html tmp/replay.html
+
+# 本地 JSON HTTP 服务：供 Godot「和 AI 对战」调用（默认 127.0.0.1:43110）
+cargo run -p splendor-pokemon-cli -- serve
 
 # 测试
 cargo test --workspace
@@ -105,12 +109,13 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 - **搜索边界**：`MinimaxBot` 只用 `GameView` 的公开信息；对手从场上保留的牌牌面公开，从牌堆顶保留的牌只保留数量。牌堆顶不可见且模拟中不补牌；搜索固定深度与分支宽度，不读墙钟时间，同一 seed 可逐字节复现。规则层僵局按平局评估，避免搜索把「让对手无行动」误判为优势。
 - **回测**：`arena` 官方模式使用 10 个固定种子（1–10）+ 10 个增量种子，每个种子交换先后手，共 40 局 2 人对局；增量游标保存在 `backend/arena-seeds.txt`，完整跑完后自动前进 10。输出胜-负-平、得分率、固定/增量种子分项、双方平均分、先/后手分项与僵局数。`--require 50` 在得分率低于门槛或出现僵局时返回失败。调试用 `--seeds N --seed-start M`，不消耗游标。完整规矩见 [`.clinerules/ai-backtest.md`](../.clinerules/ai-backtest.md)。
 - **可复现**：bot 使用独立 `BotRng`（SplitMix64），种子由 `derive_seed(game_seed, player_id)` 派生；同一 seed + 同一 bot 组合产生逐字节一致的回放。分数相同的候选由种子随机打破平局。
-- **只读决策**：bot 只接收 `GameView`，与未来 HTTP / Godot 客户端使用同一信息边界；不修改规则语义。
+- **只读决策**：bot 只接收 `GameView`，与本地 HTTP / Godot 客户端使用同一信息边界；不修改规则语义。
+- **本地对战服务**：`serve` 在 `127.0.0.1` 上提供 JSON HTTP 接口（默认端口 `43110`，`--port 0` 由系统分配并打印实际地址），单进程单会话：`GET /api/health`、`GET /api/game/state`、`POST /api/game/new`、`POST /api/game/action`、`POST /api/game/replay/save`。人类固定玩家 0；每个动作都经 `Game::apply`，随后连续推进 bot 回合直到再次轮到人类、终局或僵局。状态只发送 `view_for(0)`，不暴露牌堆与对手隐藏保留牌。服务无额外依赖，请求结束即关闭连接；`--idle-timeout 秒` 可让无人使用的服务自动退出，对局结束可由 Godot 触发写回放。
 - **回放结构**：`Replay { version, seed, players, controllers, frames, result, stalemate }`。`frames[0]` 是开局视图，之后每帧保存 `actor + Action + GameView + 本步事件文本`。为避免整局日志在每帧重复，帧内 `view.log` 只保留本步新增事件。
 - **规则僵局**：3 人局可能把普通球全部持有到供应区只剩大师球，此时若当前玩家无牌可捕捉，引擎没有合法主行动且规则未定义 pass。回放以 `stalemate: true`、无胜者收尾，不新增动作、不改变规则语义。
 - **输出位置**：`pve` / `bot-vs-bot` 默认写 `tmp/pve-<seed>-<n>p.*` 或 `tmp/bot-<seed>-<n>p.*`；`--replay` / `--html` 可覆盖。`tmp/` 已被 `.gitignore` 忽略。
 - **HTML 回放**：单个文件内嵌全部 CSS / JS / JSON，不引用 CDN、字体或图片，`file://` 直接打开。支持上一步 / 下一步 / 自动播放 / 速度 / 进度条 / 键盘方向键，展示场上牌、供应区、各玩家球与减免、分数、保留数、最近动作与终局横幅。场上牌以减免色为底，中央是完整名字大字（按名字长度自适应字号），左下角是捕捉费用彩球与数字，右上角是分数。选 HTML 而非 ratatui：无需额外终端依赖、卡片信息密度更高、可截图分享，且同一份回放 JSON 就是 `game/` Godot 前端的数据源。
-- **Godot 回放**：`game/` 是独立 Godot 4.6 工程，读取同一份回放 JSON，逐帧绘制场上牌、供应区、玩家与事件；场上牌使用与 HTML 相同的卡面语言（减免色底、中央大字、左下费用球），只读界面，不改规则。启动、操作与无头冒烟命令见根 README 与 [`game/README.md`](../game/README.md)。
+- **Godot 界面**：`game/` 是独立 Godot 4.6 工程。回放场景读取同一份回放 JSON，逐帧绘制场上牌、供应区、玩家与事件；对战场景通过 `serve` 提交动作并渲染 `view_for(0)`，支持捕捉 / 保留 / 拿球 / 弃球 / 进化与终局保存。场上牌使用与 HTML 相同的卡面语言（减免色底、中央大字、左下费用球），不改规则。启动、操作与无头冒烟命令见根 README 与 [`game/README.md`](../game/README.md)。
 
 ## 规则覆盖
 
@@ -133,7 +138,7 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 
 ## 尚未实现
 
-- 联网、PvP、HTTP / WebSocket 接口与房间、账号体系。
-- 搜索 / 学习型 bot（当前为启发式 + 定向改写，未做博弈搜索）。
+- 联网、远程 PvP、WebSocket、房间与账号体系；`serve` 只服务本机单会话。
+- 学习型 / 神经网络 bot（当前是启发式 + alpha-beta 搜索）。
 - 角色立牌的特殊能力（规则文档未提供角色效果数据，当前只记录进化次数用于平手判定）。
-- 卡图与音效：HTML / Godot 回放均用纯色块 + 文字绘制，无宝可梦立绘与音效。
+- 卡图与音效：HTML / Godot 界面均用纯色块 + 文字绘制，无宝可梦立绘与音效。

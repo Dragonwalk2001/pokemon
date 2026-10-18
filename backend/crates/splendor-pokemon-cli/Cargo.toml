@@ -11,4 +11,5 @@ path = "src/main.rs"
 
 [dependencies]
 splendor-pokemon-core.workspace = true
+serde.workspace = true
 serde_json.workspace = true

@@ -37,6 +37,7 @@ const SPEED_DEFAULT := 1
 @onready var meta_label: Label = $Margin/Root/TopBar/Meta
 @onready var open_button: Button = $Margin/Root/TopBar/OpenButton
 @onready var reload_button: Button = $Margin/Root/TopBar/ReloadButton
+@onready var battle_button: Button = $Margin/Root/TopBar/BattleButton
 @onready var prev_button: Button = $Margin/Root/Timeline/PrevButton
 @onready var play_button: Button = $Margin/Root/Timeline/PlayButton
 @onready var next_button: Button = $Margin/Root/Timeline/NextButton
@@ -82,11 +83,12 @@ func _ready() -> void:
 func _apply_styles() -> void:
 	Styles.style_button(open_button)
 	Styles.style_button(reload_button)
+	Styles.style_button(battle_button, true)
 	Styles.style_button(prev_button)
 	Styles.style_button(play_button, true)
 	Styles.style_button(next_button)
 	Styles.style_button(speed_button)
-	for button in [open_button, reload_button, prev_button, play_button, next_button, speed_button]:
+	for button in [open_button, reload_button, battle_button, prev_button, play_button, next_button, speed_button]:
 		button.focus_mode = Control.FOCUS_NONE
 	timeline_slider.focus_mode = Control.FOCUS_NONE
 	for panel in [board_panel, players_panel, supply_panel, action_panel]:
@@ -99,6 +101,7 @@ func _apply_styles() -> void:
 func _wire_signals() -> void:
 	open_button.pressed.connect(_on_open)
 	reload_button.pressed.connect(_on_reload)
+	battle_button.pressed.connect(_on_battle_pressed)
 	prev_button.pressed.connect(_on_prev)
 	play_button.pressed.connect(_toggle_play)
 	next_button.pressed.connect(_on_next)
@@ -767,6 +770,11 @@ func _on_reload() -> void:
 	if _replay_path.is_empty():
 		return
 	_load_replay(_replay_path)
+
+
+func _on_battle_pressed() -> void:
+	_stop_playing()
+	get_tree().change_scene_to_file("res://scenes/battle.tscn")
 
 
 func _unhandled_input(event: InputEvent) -> void:

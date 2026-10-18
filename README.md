@@ -1,15 +1,21 @@
 # 璀璨宝石：宝可梦（离线原型）
 
-**命令行负责对局与回测；可视化有两种：对局结束后用浏览器打开 HTML 回放，或用 Godot 打开 `game/` 载入同一份回放 JSON。**
-没有联网或 PvP；Godot 侧是只读回放界面，不接管实时对局。
+**规则与 bot 在 Rust 后端；Godot 提供两种可视化：只读回放，以及通过本地 JSON HTTP 服务直接和 AI 对战。** 没有联网或远程 PvP；Godot 不复制规则，所有动作都由后端 `Game::apply` 判定。
 
-三种用法：
+三种 CLI 用法：
 
 | 模式 | 操作方式 | 是否记录回放 |
 |---|---|---|
 | 本地热座 | 终端里多人轮流输入 | 否 |
 | PvE（1 人 + 2–3 bot） | 终端交互，bot 自动行动 | 是，终局后写文件 |
 | bot-vs-bot | 终端自动跑完 | 是，默认写文件 |
+
+Godot 里另有：
+
+| 模式 | 操作方式 | 是否记录回放 |
+|---|---|---|
+| 回放 | 读取 `tmp/*.json` 逐帧查看 | 不适用 |
+| 和 AI 对战 | 图形界面操作，1 人 + 2–3 bot；后端 `serve` 执行规则与 AI | 是，终局自动写 `tmp/pve-<seed>-<n>p.*` |
 
 ## 环境
 
@@ -174,7 +180,7 @@ HTML 是单个自包含文件，没有服务器、CDN 或联网请求。支持�
 
 ## 5. Godot 回放可视化
 
-`game/` 是独立的 Godot 4.6 工程：读取 `bot-vs-bot` / `pve` 写出的同一份回放 JSON，逐动作绘制场上牌、供应区、玩家与事件。界面只读，不建游戏、不改规则；私密信息按后端约定处理——`reserved` 只显示当前查看者可见的保留牌（自己的全部、对手从场上保留的牌），对手从牌堆顶保留的牌只显示数量。
+`game/` 是独立的 Godot 4.6 工程：回放场景读取 `bot-vs-bot` / `pve` 写出的同一份回放 JSON，逐动作绘制场上牌、供应区、玩家与事件；另有交互式的「和 AI 对战」场景（见 §6）。回放界面只读，不建游戏、不改规则；私密信息按后端约定处理——`reserved` 只显示当前查看者可见的保留牌（自己的全部、对手从场上保留的牌），对手从牌堆顶保留的牌只显示数量。
 
 在仓库根目录启动（本工作副本的 Godot 4.6 可执行文件在仓库上一级）：
 
@@ -209,6 +215,46 @@ HTML 是单个自包含文件，没有服务器、CDN 或联网请求。支持�
 - 横幅：终局显示胜者与分数；规则僵局显示无胜者说明。
 - Godot 的导入缓存 `game/.godot/` 已被 `.gitignore` 忽略；`icon.svg.import` 与脚本 `.uid` 随仓库提交。
 
+## 6. Godot 和 AI 对战
+
+`game/scenes/battle.tscn` 是交互式 PvE：你是玩家 0，对手是 2–3 个 bot。规则判定、AI 决策与回放记录全部在 Rust 后端，Godot 只发送动作并渲染引擎返回的 `GameView`，不复制规则。服务只监听 `127.0.0.1`，没有联网或远程 PvP。
+
+启动方式二选一：
+
+```bash
+# 方式 A：先启动本地服务，再打开 Godot 对战场景
+cd backend
+cargo run -p splendor-pokemon-cli -- serve          # 默认 127.0.0.1:43110
+cd ..
+../Godot_v4.6.1-stable_win64.exe --path game res://scenes/battle.tscn
+
+# 方式 B：直接打开 Godot 主场景，点右上角「和 AI 对战」
+../Godot_v4.6.1-stable_win64.exe --path game
+```
+
+方式 B 发现默认端口没有服务时，会尝试启动 `backend/target/{debug,release}/splendor-pokemon[.exe]`；该可执行文件不存在时退回 `cargo run`（首次需要编译，界面会显示启动状态）。可以用环境变量覆盖：
+
+| 环境变量 | 说明 |
+|---|---|
+| `SPLENDOR_SERVER_URL` | 直接连接指定地址，例如 `http://127.0.0.1:43110`；设置后 Godot 不再自动启动服务 |
+| `SPLENDOR_CLI` | 指定 `splendor-pokemon` 可执行文件路径，供自动启动使用 |
+
+界面操作：
+
+| 操作 | 说明 |
+|---|---|
+| 场上牌左键 | 选中卡牌，在右侧出现「捕捉 / 保留」按钮 |
+| 场上牌右键 | 直接尝试保留 |
+| 供应区颜色 | 点击循环 `0 → 1 → 2 → 0`；「拿取所选」提交拿 3 色或拿 2 同色 |
+| 我的保留牌 | 点击尝试捕捉 |
+| 弃球阶段 | 点击颜色循环选择弃球数量，达到要求后「确认弃球」 |
+| 进化阶段 | 按钮列出合法进化目标，「结束回合」跳过进化 |
+| 顶栏 | 选择 AI 数量 / 策略 / 种子；「新对局」重开；「回放」返回只读回放界面 |
+
+- 人类动作后，服务端连续推进 bot 回合，界面按返回的步骤逐个播放；再次轮到人类时才恢复操作。
+- 终局或规则僵局会显示横幅；完成后自动写入 `tmp/pve-<seed>-<n>p.json` 与同名 `.html`。
+- 本地接口：`GET /api/health`、`GET /api/game/state`、`POST /api/game/new`、`POST /api/game/action`、`POST /api/game/replay/save`。请求 / 响应均为 JSON，单会话、不持久化。
+
 ## 验证
 
 在 `backend/` 下：
@@ -227,6 +273,19 @@ SPLENDOR_SMOKE=1 SPLENDOR_REPLAY=tmp/bot-42-2p.json \
 ```
 
 冒烟会载入回放、逐帧渲染、检查 5 行牌 / 玩家面板 / 按钮边界 / 播放推进 / 终局横幅 / 布局尺寸 / 中文字形。
+
+Godot 对战冒烟（需要先构建后端；终端 1 启动服务，终端 2 跑无头场景）：
+
+```bash
+# 终端 1（在 backend/ 下）
+cargo run -p splendor-pokemon-cli -- serve --port 43111 --idle-timeout 60
+
+# 终端 2（仓库根目录）
+SPLENDOR_BATTLE_SMOKE=1 SPLENDOR_SERVER_URL=http://127.0.0.1:43111 \
+  ../Godot_v4.6.1-stable_win64_console.exe --headless --path game res://scenes/battle.tscn
+```
+
+冒烟会真实调用本地服务：开局、检查棋盘 / 玩家 / 供应区、校验界面构造的拿球与保留动作、提交一次拿球和结束回合、确认 AI 回合后回到人类，并检查中文字形。
 
 更详细的模块与设计说明见 [`backend/README.md`](backend/README.md)；Godot 工程结构见 [`game/README.md`](game/README.md)。
 

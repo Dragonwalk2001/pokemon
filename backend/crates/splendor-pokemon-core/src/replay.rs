@@ -99,9 +99,10 @@ impl ReplayRecorder {
         self.finish_with(game, true)
     }
 
-    fn finish_with(mut self, game: &Game, stalemate: bool) -> Replay {
-        self.stalemate |= stalemate;
-        let result = if self.stalemate {
+    /// 不消费记录器地生成当前快照。供交互式服务在对局中途或结束后保存回放。
+    pub fn to_replay(&self, game: &Game, stalemate: bool) -> Replay {
+        let stalemate = self.stalemate || stalemate;
+        let result = if stalemate {
             None
         } else {
             game.winners().map(|winners| ReplayResult {
@@ -115,12 +116,16 @@ impl ReplayRecorder {
         Replay {
             version: REPLAY_VERSION,
             seed: self.seed,
-            players: self.players,
-            controllers: self.controllers,
-            frames: self.frames,
+            players: self.players.clone(),
+            controllers: self.controllers.clone(),
+            frames: self.frames.clone(),
             result,
-            stalemate: self.stalemate,
+            stalemate,
         }
+    }
+
+    fn finish_with(self, game: &Game, stalemate: bool) -> Replay {
+        self.to_replay(game, stalemate)
     }
 
     fn push_frame(&mut self, game: &Game, actor: Option<PlayerId>, action: Option<Action>) {
