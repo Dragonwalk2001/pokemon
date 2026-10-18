@@ -32,6 +32,6 @@ pub use minimax::MinimaxBot;
 pub use replay::{Replay, ReplayFrame, ReplayRecorder, ReplayResult, REPLAY_VERSION};
 pub use types::{
     Action, Card, CardId, CardSource, Category, Color, Event, EvolutionRequirement, Phase, Player,
-    PlayerId, TokenCounts,
+    PlayerId, ReservedCard, TokenCounts,
 };
 pub use view::{BoardView, GameView, PlayerView};

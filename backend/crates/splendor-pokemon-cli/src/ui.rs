@@ -70,13 +70,43 @@ pub(crate) fn print_state(game: &Game) {
     }
 
     let current = game.current_player();
+    let mut opponents_shown = false;
+    for (index, player) in game.players().iter().enumerate() {
+        if index == current {
+            continue;
+        }
+        let visible: Vec<&Card> = player
+            .reserved()
+            .iter()
+            .filter(|reserved| !reserved.hidden)
+            .filter_map(|reserved| game.card(reserved.card))
+            .collect();
+        let hidden = player
+            .reserved()
+            .iter()
+            .filter(|reserved| reserved.hidden)
+            .count();
+        if visible.is_empty() && hidden == 0 {
+            continue;
+        }
+        if !opponents_shown {
+            println!("对手保留牌:");
+            opponents_shown = true;
+        }
+        println!(
+            "  {}: {}",
+            player.name(),
+            reserved_summary(visible.iter().copied(), hidden)
+        );
+    }
+
     if let Some(player) = game.players().get(current) {
         if player.reserved().is_empty() {
             println!("你的保留牌: 无");
         } else {
-            println!("你的保留牌（仅自己可见）:");
-            for (index, card_id) in player.reserved().iter().enumerate() {
-                if let Some(card) = game.card(*card_id) {
+            println!("你的保留牌:");
+            for (index, reserved) in player.reserved().iter().enumerate() {
+                if let Some(card) = game.card(reserved.card) {
                     println!("  [{index}] {}", card_summary(card));
                 }
             }
@@ -90,7 +120,8 @@ pub(crate) fn print_state(game: &Game) {
     }
 }
 
-/// 从固定查看者的视图渲染，PvE 中始终以人类玩家视角显示，避免泄露 bot 保留牌。
+/// 从固定查看者的视图渲染，PvE 中始终以人类玩家视角显示，避免泄露 bot
+/// 从牌堆顶保留的牌。
 pub(crate) fn print_view(view: &GameView, viewer: PlayerId) {
     println!(
         "\n=== 第 {} 回合 | 当前: {} | 阶段: {} ===",
@@ -134,11 +165,38 @@ pub(crate) fn print_view(view: &GameView, viewer: PlayerId) {
         );
     }
 
+    let opponents: Vec<_> = view
+        .players
+        .iter()
+        .filter(|player| player.id != viewer)
+        .collect();
+    let has_opponent_reserved = opponents.iter().any(|player| {
+        player
+            .reserved
+            .as_ref()
+            .is_some_and(|cards| !cards.is_empty())
+            || player.hidden_reserved_count > 0
+    });
+    if has_opponent_reserved {
+        println!("对手保留牌:");
+        for player in opponents {
+            let visible = player.reserved.as_deref().unwrap_or(&[]);
+            if visible.is_empty() && player.hidden_reserved_count == 0 {
+                continue;
+            }
+            println!(
+                "  {}: {}",
+                player.name,
+                reserved_summary(visible.iter(), player.hidden_reserved_count)
+            );
+        }
+    }
+
     if let Some(player) = view.players.get(viewer) {
         match player.reserved.as_ref() {
             Some(cards) if cards.is_empty() => println!("你的保留牌: 无"),
             Some(cards) => {
-                println!("你的保留牌（仅自己可见）:");
+                println!("你的保留牌:");
                 for (index, card) in cards.iter().enumerate() {
                     println!("  [{index}] {}", card_summary(card));
                 }
@@ -161,6 +219,18 @@ pub(crate) fn print_view(view: &GameView, viewer: PlayerId) {
             .collect();
         let suffix = if names.len() > 1 { "（并列）" } else { "" };
         println!("对局结束，胜者：{}{}", names.join("、"), suffix);
+    }
+}
+
+/// 汇总当前查看者可见的保留牌，并附上未公开数量。
+fn reserved_summary<'a>(cards: impl Iterator<Item = &'a Card>, hidden: usize) -> String {
+    let names: Vec<String> = cards.map(card_summary).collect();
+    if names.is_empty() {
+        format!("{hidden} 张未公开")
+    } else if hidden > 0 {
+        format!("{}（另有 {hidden} 张未公开）", names.join("、"))
+    } else {
+        names.join("、")
     }
 }
 

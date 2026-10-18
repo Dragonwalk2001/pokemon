@@ -3,7 +3,8 @@ extends Control
 ##
 ## 数据来源是 Rust CLI 写出的 replay JSON（tmp/*.json）。界面只读，不建游戏、
 ## 不改规则：每一帧都从 `frames[i].view` 重新绘制。私密信息遵循后端约定——
-## 每帧视图来自执行动作的玩家，其他玩家只显示保留牌数量。
+## 每帧视图来自执行动作的玩家：自己的保留牌全部可见，对手只显示从场上
+## 保留的牌；从牌堆顶保留的牌只暴露数量。
 ##
 ## 回放路径解析顺序：命令行 `-- <path>` > 环境变量 SPLENDOR_REPLAY >
 ## 仓库 tmp/ 下最新的 *.json > 空状态提示。
@@ -312,7 +313,7 @@ func _render_action(frame: Dictionary, view: Dictionary) -> void:
 		]
 	else:
 		action_main.text = str(frame.get("action_text", "—"))
-		action_actor.text = "%s 执行 · 第 %d 回合 · %s · 视角：%s（其保留牌可见）" % [
+		action_actor.text = "%s 执行 · 第 %d 回合 · %s · 视角：%s（保留牌按公开信息显示）" % [
 			_player_name(view, int(actor)),
 			int(view.get("turn_number", 0)),
 			str(PHASES.get(phase, phase)),
@@ -421,6 +422,10 @@ func _build_player_panel(player: Dictionary, current_id: int, game_over: bool) -
 		reserved_visible = true
 		var reserved_src: Array = reserved_v
 		reserved = reserved_src.duplicate()
+	var hidden_reserved := maxi(
+		0,
+		int(player.get("reserved_count", 0)) - reserved.size()
+	)
 
 	if captured.is_empty():
 		cards_row.add_child(_chip("尚无宝可梦"))
@@ -434,7 +439,7 @@ func _build_player_panel(player: Dictionary, current_id: int, game_over: bool) -
 			cards_row.add_child(_chip("… +%d" % (captured.size() - captured_limit)))
 
 	if reserved_visible:
-		if reserved.is_empty():
+		if reserved.is_empty() and hidden_reserved == 0:
 			cards_row.add_child(_chip("保留牌：无"))
 		else:
 			var reserved_limit := mini(2, reserved.size())
@@ -444,8 +449,10 @@ func _build_player_panel(player: Dictionary, current_id: int, game_over: bool) -
 					cards_row.add_child(_card_chip(card_v, true))
 			if reserved.size() > reserved_limit:
 				cards_row.add_child(_chip("… +%d" % (reserved.size() - reserved_limit)))
-	elif int(player.get("reserved_count", 0)) > 0:
-		cards_row.add_child(_chip("保留 %d 张（未公开）" % int(player.get("reserved_count", 0))))
+			if hidden_reserved > 0:
+				cards_row.add_child(_chip("另 %d 张未公开" % hidden_reserved))
+	elif hidden_reserved > 0:
+		cards_row.add_child(_chip("保留 %d 张（未公开）" % hidden_reserved))
 
 	panel.tooltip_text = _player_tooltip(player, captured, reserved, reserved_visible)
 	return panel
@@ -595,18 +602,22 @@ func _player_tooltip(
 		"、".join(captured_parts) if not captured_parts.is_empty() else "无",
 	])
 
+	var reserved_count := int(player.get("reserved_count", 0))
+	var hidden_reserved := maxi(0, reserved_count - reserved.size())
 	if reserved_visible:
 		var reserved_parts: Array[String] = []
 		for card_v in reserved:
 			if card_v is Dictionary:
 				var card: Dictionary = card_v
 				reserved_parts.append(str(card.get("name_zh", "?")))
+		if hidden_reserved > 0:
+			reserved_parts.append("%d 张未公开" % hidden_reserved)
 		lines.append("保留 %d 张：%s" % [
-			reserved.size(),
+			reserved_count,
 			"、".join(reserved_parts) if not reserved_parts.is_empty() else "无",
 		])
 	else:
-		lines.append("保留：%d 张（未公开）" % int(player.get("reserved_count", 0)))
+		lines.append("保留：%d 张（未公开）" % reserved_count)
 	return "\n".join(lines)
 
 
@@ -614,6 +625,19 @@ func _spacer() -> Control:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return spacer
+
+
+func _collect_text(node: Node) -> String:
+	var parts: Array[String] = []
+	if node is Label:
+		parts.append((node as Label).text)
+	elif node is Button:
+		parts.append((node as Button).text)
+	for child in node.get_children():
+		var child_text := _collect_text(child)
+		if not child_text.is_empty():
+			parts.append(child_text)
+	return "\n".join(parts)
 
 
 func _clear(container: Node) -> void:
@@ -843,6 +867,57 @@ func _run_smoke() -> void:
 				i, players_row.get_child_count(), expected,
 			])
 			break
+
+	# 公开保留牌必须实际渲染到玩家面板；旧回放没有公开保留牌时跳过。
+	var reserved_frame := -1
+	var reserved_player := -1
+	var reserved_name := ""
+	for i in frames.size():
+		var candidate: Dictionary = frames[i]
+		var candidate_view: Variant = candidate.get("view", {})
+		if not (candidate_view is Dictionary):
+			continue
+		var actor_v: Variant = candidate.get("actor")
+		if actor_v == null:
+			continue
+		var actor_id := int(actor_v)
+		var players_v: Variant = (candidate_view as Dictionary).get("players", [])
+		if not (players_v is Array):
+			continue
+		for player_v in players_v:
+			if not (player_v is Dictionary):
+				continue
+			var player: Dictionary = player_v
+			var player_id := int(player.get("id", 0))
+			if player_id == actor_id:
+				continue
+			var reserved_v: Variant = player.get("reserved")
+			if not (reserved_v is Array) or (reserved_v as Array).is_empty():
+				continue
+			var cards: Array = reserved_v
+			var card_v: Variant = cards[0]
+			if card_v is Dictionary:
+				reserved_frame = i
+				reserved_player = player_id
+				reserved_name = str((card_v as Dictionary).get("name_zh", ""))
+				break
+		if reserved_frame >= 0:
+			break
+	if reserved_frame >= 0:
+		_go(reserved_frame)
+		await get_tree().process_frame
+		if reserved_player < players_row.get_child_count():
+			var panel_text := _collect_text(players_row.get_child(reserved_player))
+			if panel_text.find(reserved_name) < 0:
+				failures.append(
+					"第 %d 帧公开保留牌「%s」未渲染" % [reserved_frame, reserved_name]
+				)
+			else:
+				print("[smoke] 公开保留牌渲染 OK：第 %d 帧 / %s" % [
+					reserved_frame, reserved_name,
+				])
+	else:
+		print("[smoke] 回放没有公开保留牌，跳过保留牌渲染断言")
 
 	# 按钮边界。
 	_stop_playing()

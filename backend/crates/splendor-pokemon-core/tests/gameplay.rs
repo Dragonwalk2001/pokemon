@@ -102,7 +102,7 @@ fn take_two_requires_four_in_supply() {
 }
 
 #[test]
-fn opponent_reserved_cards_are_hidden() {
+fn deck_reserved_cards_are_private() {
     let mut game = new_game(2, 7);
     game.apply(
         0,
@@ -116,6 +116,7 @@ fn opponent_reserved_cards_are_hidden() {
     let opponent_view = game.view_for(1);
     assert!(opponent_view.players[0].reserved.is_none());
     assert_eq!(opponent_view.players[0].reserved_count, 1);
+    assert_eq!(opponent_view.players[0].hidden_reserved_count, 1);
 
     let own_view = game.view_for(0);
     assert_eq!(
@@ -126,6 +127,83 @@ fn opponent_reserved_cards_are_hidden() {
             .len(),
         1
     );
+    assert_eq!(own_view.players[0].hidden_reserved_count, 0);
+}
+
+#[test]
+fn board_reserved_cards_are_public() {
+    let mut game = new_game(2, 7);
+    let card_id = game.board().get(Category::Level1, 0).unwrap();
+    game.apply(
+        0,
+        Action::Reserve {
+            source: CardSource::board(Category::Level1, 0),
+        },
+    )
+    .unwrap();
+    game.apply(0, Action::EndTurn).unwrap();
+
+    let opponent_view = game.view_for(1);
+    let visible = opponent_view.players[0]
+        .reserved
+        .as_ref()
+        .expect("board-reserved card is public");
+    assert_eq!(visible.len(), 1);
+    assert_eq!(visible[0].id, card_id);
+    assert_eq!(opponent_view.players[0].reserved_count, 1);
+    assert_eq!(opponent_view.players[0].hidden_reserved_count, 0);
+}
+
+#[test]
+fn mixed_reserved_cards_keep_only_deck_source_private() {
+    let mut game = new_game(2, 7);
+    let board_card = game.board().get(Category::Level1, 0).unwrap();
+    game.apply(
+        0,
+        Action::Reserve {
+            source: CardSource::board(Category::Level1, 0),
+        },
+    )
+    .unwrap();
+    game.apply(0, Action::EndTurn).unwrap();
+
+    game.apply(
+        1,
+        Action::TakeThree {
+            colors: vec![Color::Red, Color::Blue, Color::Yellow],
+        },
+    )
+    .unwrap();
+    game.apply(1, Action::EndTurn).unwrap();
+
+    game.apply(
+        0,
+        Action::Reserve {
+            source: CardSource::deck_top(Category::Level2),
+        },
+    )
+    .unwrap();
+
+    let opponent_view = game.view_for(1);
+    let visible = opponent_view.players[0]
+        .reserved
+        .as_ref()
+        .expect("board-reserved card stays visible");
+    assert_eq!(visible.len(), 1);
+    assert_eq!(visible[0].id, board_card);
+    assert_eq!(opponent_view.players[0].reserved_count, 2);
+    assert_eq!(opponent_view.players[0].hidden_reserved_count, 1);
+
+    let own_view = game.view_for(0);
+    assert_eq!(
+        own_view.players[0]
+            .reserved
+            .as_ref()
+            .expect("own reserved cards are visible")
+            .len(),
+        2
+    );
+    assert_eq!(own_view.players[0].hidden_reserved_count, 0);
 }
 
 #[test]

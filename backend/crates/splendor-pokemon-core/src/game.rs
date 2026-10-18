@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use crate::catalog::Catalog;
 use crate::error::GameError;
 use crate::types::{
-    Action, Card, CardId, CardSource, Category, Color, Event, Phase, Player, PlayerId, TokenCounts,
+    Action, Card, CardId, CardSource, Category, Color, Event, Phase, Player, PlayerId,
+    ReservedCard, TokenCounts,
 };
 
 pub const MIN_PLAYERS: usize = 2;
@@ -533,7 +534,13 @@ impl Game {
             self.decks.draw(category);
         }
 
-        self.players[player].reserved.push(card_id);
+        self.players[player]
+            .reserved
+            .push(if deck_category.is_some() {
+                ReservedCard::from_deck(card_id)
+            } else {
+                ReservedCard::from_board(card_id)
+            });
 
         let got_master = if self.supply.master > 0 {
             self.supply.master -= 1;
@@ -569,7 +576,7 @@ impl Game {
                 let card_id = self.players[player]
                     .reserved
                     .get(*index)
-                    .copied()
+                    .map(|reserved| reserved.card)
                     .ok_or_else(|| {
                         GameError::InvalidAction(format!("你没有第 {index} 张保留牌"))
                     })?;
@@ -774,7 +781,7 @@ impl Game {
                 let card_id = self.players[player]
                     .reserved
                     .get(*index)
-                    .copied()
+                    .map(|reserved| reserved.card)
                     .ok_or_else(|| {
                         GameError::InvalidAction(format!("你没有第 {index} 张保留牌"))
                     })?;
@@ -993,8 +1000,8 @@ impl Game {
                 }
             }
         }
-        for (index, card_id) in self.players[player].reserved.iter().enumerate() {
-            if self.can_afford(player, *card_id) {
+        for (index, reserved) in self.players[player].reserved.iter().enumerate() {
+            if self.can_afford(player, reserved.card) {
                 actions.push(Action::Capture {
                     source: CardSource::reserved(index),
                 });
@@ -1045,10 +1052,10 @@ impl Game {
                         }
                     }
                 }
-                for (index, target_id) in self.players[player].reserved.iter().enumerate() {
+                for (index, reserved) in self.players[player].reserved.iter().enumerate() {
                     let matches = self
                         .catalog
-                        .get(*target_id)
+                        .get(reserved.card)
                         .map(|target| {
                             target.category == next_category
                                 && target.name_zh.as_str() == expected_name
@@ -1247,7 +1254,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(game.players[0].reserved, vec![card_id]);
+        assert_eq!(
+            game.players[0].reserved,
+            vec![ReservedCard::from_board(card_id)]
+        );
         assert_eq!(game.players[0].tokens.master, 1);
         assert_eq!(game.supply.master, 4);
         assert_eq!(game.board.get(Category::Level1, 0), Some(deck_top));
@@ -1257,7 +1267,11 @@ mod tests {
     #[test]
     fn reserve_respects_limit_and_rarity() {
         let mut game = new_game(2, 1);
-        game.players[0].reserved = vec![1100, 1101, 1102];
+        game.players[0].reserved = vec![
+            ReservedCard::from_board(1100),
+            ReservedCard::from_board(1101),
+            ReservedCard::from_board(1102),
+        ];
         assert!(game
             .apply(
                 0,
@@ -1453,7 +1467,7 @@ mod tests {
         let (mut game, source_id, target_id, pink_bonus) = evolution_fixture();
         game.players[0].captured = vec![source_id];
         game.players[0].captured.extend(pink_bonus);
-        game.players[0].reserved = vec![target_id];
+        game.players[0].reserved = vec![ReservedCard::from_board(target_id)];
         game.phase = Phase::Evolution;
 
         game.apply(
@@ -1591,6 +1605,20 @@ mod tests {
         assert_eq!(game.bonuses_for(0).get(Color::Red), 2);
         assert_eq!(game.supply.master, 6);
         assert!(game.players[0].captured.contains(&4100));
+    }
+
+    #[test]
+    fn game_accepts_legacy_reserved_ids() {
+        let mut game = new_game(2, 99);
+        game.players[0].reserved = vec![ReservedCard::from_board(1100)];
+        let mut value = serde_json::to_value(&game).unwrap();
+        value["players"][0]["reserved"] = serde_json::json!([1100]);
+
+        let restored: Game = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            restored.players[0].reserved,
+            vec![ReservedCard::from_board(1100)]
+        );
     }
 
     #[test]

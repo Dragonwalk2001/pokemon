@@ -38,7 +38,7 @@ game/
 
 - 每帧使用 `frames[i].view`，字段与后端 `GameView` 一致：`board`、`supply`、`players`、`current_player`、`phase`、`winners`、`legal_actions`。
 - `frames[0]` 是开局视图，之后每帧保存 `actor + Action + GameView + 本步事件文本`。
-- 视图按执行动作的玩家生成：自己的 `reserved` 是数组，对手为 `null` 且只有 `reserved_count`。界面不额外泄露牌面。
+- 视图按执行动作的玩家生成：`reserved` 只包含当前查看者可见的保留牌。自己能看到全部；对手从场上保留的牌牌面公开，从牌堆顶保留的牌只通过 `hidden_reserved_count` 暴露数量。界面不额外泄露牌面。
 - 场上牌、费用、减免、进化需求全部来自卡牌对象；Godot 不重新计算规则。
 - 卡面中央大字直接取 `name_zh`，按名字长度自适应字号；卡面不重复显示小名字，完整信息仍在 tooltip 中。
 
@@ -67,6 +67,6 @@ SPLENDOR_SMOKE=1 SPLENDOR_REPLAY=tmp/bot-42-2p.json \
   ../Godot_v4.6.1-stable_win64_console.exe --headless --path game
 ```
 
-退出码 0 通过。检查项：回放载入、5 行牌槽位、玩家面板数量、首末帧按钮状态、播放 tick、终局横幅、控件尺寸、SystemFont 中文字形。
+退出码 0 通过。检查项：回放载入、5 行牌槽位、玩家面板数量、公开保留牌渲染、首末帧按钮状态、播放 tick、终局横幅、控件尺寸、SystemFont 中文字形。
 
 无头模式只验证逻辑与 Control 排版，不验证绘制像素；需要看画面时去掉 `--headless`。

@@ -1,7 +1,8 @@
 //! 极小化极大（minimax + alpha-beta 剪枝）搜索 bot。
 //!
 //! 信息边界与其它 bot 一致：搜索状态完全由 [`GameView`] 构造，只包含公开信息
-//! 与自己的保留牌；对手保留牌只保留数量，牌堆顶未知，因此模拟中不补牌。
+//! 与自己的全部保留牌；对手从场上保留的牌牌面公开，从牌堆顶保留的牌只记录
+//! 数量。牌堆顶未知，因此模拟中不补牌。
 //! 搜索不使用墙钟时间，固定深度与固定分支宽度保证同一 `(seed, 局面)` 逐字节可复现。
 //!
 //! 搜索以一个完整回合为一步：主要行动 → 自动弃球 → 自动进化 → 换手。
@@ -33,7 +34,7 @@ struct SearchPlayer {
     bonuses: TokenCounts,
     captured: Vec<Rc<Card>>,
     reserved: Vec<Rc<Card>>,
-    /// 对手保留牌数量；牌面未知，仅用于估值。
+    /// 对手从牌堆顶保留的牌数量；牌面未知，仅用于估值。
     hidden_reserved: usize,
     evolved_count: usize,
     turns_taken: u32,
@@ -67,8 +68,8 @@ struct SearchState {
 impl SearchState {
     /// 从查看者视角构造模拟状态。
     ///
-    /// 对手的 `reserved` 在视图里是 `None`，这里只记录数量，不伪造牌面；
-    /// 牌堆顺序不可见且不参与搜索。
+    /// 对手从场上保留的牌在视图里可见，直接进入模拟；从牌堆顶保留的牌
+    /// 只有数量，不伪造牌面。牌堆顺序不可见且不参与搜索。
     fn from_view(view: &GameView) -> Self {
         let players = view
             .players
@@ -86,7 +87,7 @@ impl SearchState {
                     tokens: player.tokens,
                     bonuses,
                     captured,
-                    hidden_reserved: player.reserved_count.saturating_sub(reserved.len()),
+                    hidden_reserved: player.hidden_reserved_count,
                     reserved,
                     evolved_count: player.evolution_count,
                     turns_taken: player.turns_taken,
@@ -1187,6 +1188,56 @@ mod tests {
         assert_eq!(state.players[1].hidden_reserved, 0);
         assert_eq!(state.points(0), view.players[0].points);
         assert!(!state.legal_main_actions().is_empty());
+    }
+
+    #[test]
+    fn search_state_keeps_board_reserved_cards_visible() {
+        let mut game = Game::new(vec!["A".to_string(), "B".to_string()], 42).unwrap();
+        game.apply(
+            0,
+            Action::TakeThree {
+                colors: vec![Color::Red, Color::Blue, Color::Yellow],
+            },
+        )
+        .unwrap();
+        game.apply(0, Action::EndTurn).unwrap();
+        game.apply(
+            1,
+            Action::Reserve {
+                source: CardSource::board(Category::Level1, 0),
+            },
+        )
+        .unwrap();
+        game.apply(1, Action::EndTurn).unwrap();
+
+        let state = SearchState::from_view(&game.view_for(0));
+        assert_eq!(state.players[1].reserved.len(), 1);
+        assert_eq!(state.players[1].hidden_reserved, 0);
+    }
+
+    #[test]
+    fn search_state_only_counts_deck_reserves_as_hidden() {
+        let mut game = Game::new(vec!["A".to_string(), "B".to_string()], 42).unwrap();
+        game.apply(
+            0,
+            Action::TakeThree {
+                colors: vec![Color::Red, Color::Blue, Color::Yellow],
+            },
+        )
+        .unwrap();
+        game.apply(0, Action::EndTurn).unwrap();
+        game.apply(
+            1,
+            Action::Reserve {
+                source: CardSource::deck_top(Category::Level1),
+            },
+        )
+        .unwrap();
+        game.apply(1, Action::EndTurn).unwrap();
+
+        let state = SearchState::from_view(&game.view_for(0));
+        assert!(state.players[1].reserved.is_empty());
+        assert_eq!(state.players[1].hidden_reserved, 1);
     }
 
     #[test]

@@ -196,3 +196,29 @@ fn replay_json_round_trips() {
     let last = loaded.frames.last().expect("last frame");
     assert!(last.view.log.len() <= last.events.len());
 }
+
+#[test]
+fn replay_without_hidden_reserved_count_still_loads() {
+    let replay = play_bot_game(names(2), 99, &[BotKind::Heuristic, BotKind::Random])
+        .expect("game should finish");
+    let mut value = serde_json::to_value(&replay).expect("replay to json value");
+    for frame in value["frames"].as_array_mut().expect("frames array") {
+        for player in frame["view"]["players"]
+            .as_array_mut()
+            .expect("players array")
+        {
+            player
+                .as_object_mut()
+                .expect("player object")
+                .remove("hidden_reserved_count");
+        }
+    }
+
+    let loaded: Replay = serde_json::from_value(value).expect("legacy replay should load");
+    assert_eq!(loaded.frames.len(), replay.frames.len());
+    assert!(loaded.frames.iter().all(|frame| frame
+        .view
+        .players
+        .iter()
+        .all(|player| player.hidden_reserved_count == 0)));
+}

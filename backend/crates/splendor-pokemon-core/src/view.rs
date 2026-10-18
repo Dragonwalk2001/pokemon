@@ -1,4 +1,7 @@
-//! 面向客户端的只读视图。对手的保留牌只暴露数量，自己的保留牌才展示牌面。
+//! 面向客户端的只读视图。
+//!
+//! 保留牌的可见性取决于来源：从场上正面牌保留的牌，牌面在保留前已经公开，
+//! 所有玩家都能看到；只有从牌堆顶保留的牌对对手保密。
 
 use serde::{Deserialize, Serialize};
 
@@ -27,10 +30,13 @@ pub struct PlayerView {
     pub points: u16,
     pub bonuses: TokenCounts,
     pub captured: Vec<Card>,
-    /// 对手只能看到保留牌数量。
     pub reserved_count: usize,
-    /// 只有查看自己的视图时才为 `Some`。
+    /// 当前查看者可见的保留牌：自己的全部保留牌，以及对手从场上保留的牌。
+    /// 对手没有可见保留牌时为 `None`。
     pub reserved: Option<Vec<Card>>,
+    /// 当前查看者看不到的保留牌数量，即对手从牌堆顶保留的牌。
+    #[serde(default)]
+    pub hidden_reserved_count: usize,
     pub evolution_count: usize,
     pub card_count: usize,
     pub turns_taken: u32,
@@ -67,14 +73,23 @@ impl Game {
                     .iter()
                     .filter_map(|card_id| self.card(*card_id).cloned())
                     .collect();
-                let reserved = if id == viewer {
-                    Some(
-                        player
-                            .reserved()
-                            .iter()
-                            .filter_map(|card_id| self.card(*card_id).cloned())
-                            .collect(),
-                    )
+                let visible_reserved: Vec<Card> = player
+                    .reserved()
+                    .iter()
+                    .filter(|reserved| id == viewer || !reserved.hidden)
+                    .filter_map(|reserved| self.card(reserved.card).cloned())
+                    .collect();
+                let hidden_reserved_count = if id == viewer {
+                    0
+                } else {
+                    player
+                        .reserved()
+                        .iter()
+                        .filter(|reserved| reserved.hidden)
+                        .count()
+                };
+                let reserved = if id == viewer || !visible_reserved.is_empty() {
+                    Some(visible_reserved)
                 } else {
                     None
                 };
@@ -87,6 +102,7 @@ impl Game {
                     captured,
                     reserved_count: player.reserved().len(),
                     reserved,
+                    hidden_reserved_count,
                     evolution_count: player.evolved_away().len(),
                     card_count: player.captured().len(),
                     turns_taken: player.turns_taken(),

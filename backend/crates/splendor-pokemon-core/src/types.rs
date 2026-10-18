@@ -293,13 +293,62 @@ impl Card {
 pub type PlayerId = usize;
 pub type CardId = u32;
 
+/// 手牌中的一张保留牌。
+///
+/// 从场上正面牌保留时，牌面在保留前已经公开；只有从牌堆顶保留的牌
+/// 才对其他玩家保密。`hidden` 记录后者。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReservedCard {
+    pub card: CardId,
+    pub hidden: bool,
+}
+
+impl ReservedCard {
+    /// 从场上正面牌保留：牌面公开。
+    pub const fn from_board(card: CardId) -> Self {
+        Self {
+            card,
+            hidden: false,
+        }
+    }
+
+    /// 从牌堆顶保留：牌面只对持有者可见。
+    pub const fn from_deck(card: CardId) -> Self {
+        Self { card, hidden: true }
+    }
+}
+
+/// 兼容旧存档中直接存卡牌 ID 的 `reserved` 数组；旧数据没有来源信息，
+/// 按场上保留（公开）读取。
+fn deserialize_reserved<'de, D>(deserializer: D) -> Result<Vec<ReservedCard>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Entry {
+        Card(ReservedCard),
+        Id(CardId),
+    }
+
+    let entries = Vec::<Entry>::deserialize(deserializer)?;
+    Ok(entries
+        .into_iter()
+        .map(|entry| match entry {
+            Entry::Card(card) => card,
+            Entry::Id(card) => ReservedCard::from_board(card),
+        })
+        .collect())
+}
+
 /// 一名玩家。字段私有，保证规则引擎之外不能随意破坏状态。
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Player {
     pub(crate) name: String,
     pub(crate) tokens: TokenCounts,
     pub(crate) captured: Vec<CardId>,
-    pub(crate) reserved: Vec<CardId>,
+    #[serde(deserialize_with = "deserialize_reserved")]
+    pub(crate) reserved: Vec<ReservedCard>,
     pub(crate) evolved_away: Vec<CardId>,
     pub(crate) turns_taken: u32,
 }
@@ -328,7 +377,7 @@ impl Player {
         &self.captured
     }
 
-    pub fn reserved(&self) -> &[CardId] {
+    pub fn reserved(&self) -> &[ReservedCard] {
         &self.reserved
     }
 

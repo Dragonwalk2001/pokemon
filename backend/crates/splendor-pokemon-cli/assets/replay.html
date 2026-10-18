@@ -443,18 +443,20 @@
     }
     element.append(captured);
 
-    if (Array.isArray(player.reserved)) {
+    if (Array.isArray(player.reserved) || player.reserved_count > 0) {
       const reserved = node("div", "chips");
-      if (player.reserved.length) {
-        for (const card of player.reserved) {
-          reserved.append(node("span", "chip", `保留：${card.name_zh} ${card.points}分`));
-        }
-      } else {
+      const visible = Array.isArray(player.reserved) ? player.reserved : [];
+      for (const card of visible) {
+        reserved.append(node("span", "chip", `保留：${card.name_zh} ${card.points}分`));
+      }
+      const hidden = Math.max(0, (player.reserved_count || 0) - visible.length);
+      if (hidden > 0) {
+        reserved.append(node("span", "chip", `另 ${hidden} 张未公开`));
+      }
+      if (!visible.length && hidden === 0) {
         reserved.append(node("span", "chip", "保留牌：无"));
       }
       element.append(reserved);
-    } else if (player.reserved_count > 0) {
-      element.append(node("div", "kv", `保留牌：${player.reserved_count} 张（未公开）`));
     }
 
     return element;
