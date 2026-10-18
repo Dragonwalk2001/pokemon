@@ -95,7 +95,10 @@ pub(crate) fn write_replay(
 
     println!("回放 JSON: {}", json_path.display());
     println!("回放 HTML: {}", html_path.display());
-    println!("提示：回放 HTML可在浏览器 file:// 直接打开", html_path.display());
+    println!(
+        "提示：回放 HTML 可在浏览器 file:// 直接打开：{}",
+        html_path.display()
+    );
     Ok(())
 }
 
@@ -180,8 +183,9 @@ impl BotsConfig {
                 "--bot" | "--bot-style" => {
                     index += 1;
                     let value = args.get(index).ok_or("--bot 缺少数值")?;
-                    bot = BotKind::parse(value)
-                        .ok_or_else(|| format!("未知 bot {value:?}，可用 heuristic / random"))?;
+                    bot = BotKind::parse(value).ok_or_else(|| {
+                        format!("未知 bot {value:?}，可用 heuristic / heuristic-v1 / random")
+                    })?;
                 }
                 "--replay" => {
                     index += 1;

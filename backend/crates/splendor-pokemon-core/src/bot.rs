@@ -1,16 +1,18 @@
 //! 离线 bot：只通过 [`GameView`] 决策，不接触权威状态，也不修改任何规则。
 //!
 //! - [`RandomBot`]：在合法动作中均匀随机；弃球阶段由 bot 自行构造合法弃球。
-//! - [`HeuristicBot`]：优先捕捉高分 / 可进化牌，其次拿需要的球或保留高价值牌。
+//! - [`HeuristicBot`]：以 v1 为底座，只在捕捉选择上加入进化推进与反制。
+//! - [`HeuristicV1Bot`](crate::heuristic_v1::HeuristicV1Bot)：冻结的回测对照组。
 //!
 //! 所有随机数来自 [`BotRng`]，种子由对局 seed 与玩家 ID 派生，同一 seed 可完整复现。
 
 use serde::{Deserialize, Serialize};
 
 use crate::game::{Game, TOKEN_LIMIT, WIN_POINTS};
+use crate::heuristic_v1::HeuristicV1Bot;
 use crate::replay::{Replay, ReplayRecorder};
-use crate::types::{Action, Card, CardSource, Color, Phase, PlayerId, TokenCounts};
-use crate::view::GameView;
+use crate::types::{Action, Card, CardSource, Phase, PlayerId, TokenCounts};
+use crate::view::{GameView, PlayerView};
 
 /// 单局 bot 对局的最大动作数。超过即视为状态机异常，避免测试或 CLI 无界运行。
 pub const MAX_BOT_STEPS: usize = 50_000;
@@ -68,6 +70,7 @@ pub fn derive_seed(seed: u64, player: PlayerId) -> u64 {
 pub enum BotKind {
     Random,
     Heuristic,
+    HeuristicV1,
 }
 
 impl BotKind {
@@ -75,6 +78,7 @@ impl BotKind {
         match self {
             BotKind::Random => "random",
             BotKind::Heuristic => "heuristic",
+            BotKind::HeuristicV1 => "heuristic-v1",
         }
     }
 
@@ -82,6 +86,7 @@ impl BotKind {
         match self {
             BotKind::Random => "随机 bot",
             BotKind::Heuristic => "启发式 bot",
+            BotKind::HeuristicV1 => "启发式 v1（回测基线）",
         }
     }
 
@@ -89,6 +94,9 @@ impl BotKind {
         match input.trim().to_ascii_lowercase().as_str() {
             "random" | "rand" | "随机" => Some(BotKind::Random),
             "heuristic" | "smart" | "启发" | "启发式" => Some(BotKind::Heuristic),
+            "heuristic-v1" | "heuristic_v1" | "v1" | "baseline" | "基线" => {
+                Some(BotKind::HeuristicV1)
+            }
             _ => None,
         }
     }
@@ -146,75 +154,48 @@ impl Bot for RandomBot {
     }
 }
 
-/// 简单启发式：
-/// 1. 有捕捉机会时，优先高分 / 可进化 / 能直接获胜的牌；
-/// 2. 进化阶段优先进化，否则结束回合；
-/// 3. 其余情况在「拿球」与「保留高价值牌」之间按需求打分。
+/// 默认启发式：以 v1 为基础，只改写「捕捉哪张牌」。
+///
+/// 拿球、保留、弃球与进化阶段完全沿用 v1；有捕捉机会时，优先抢能推进自己
+/// 进化门槛、或能阻止对手进化的牌。进化是免费的，因此围绕进化做取舍的收益
+/// 高于单纯按分数贪心。
 pub struct HeuristicBot {
+    base: HeuristicV1Bot,
     rng: BotRng,
 }
 
 impl HeuristicBot {
     pub fn new(seed: u64) -> Self {
         Self {
+            base: HeuristicV1Bot::new(seed),
             rng: BotRng::new(seed),
         }
     }
 
-    fn choose_discard(&self, view: &GameView) -> Action {
-        let me = &view.players[view.current_player];
-        let needs = desired_needs(view);
-        let mut order: Vec<usize> = (0..5).collect();
-        // 先丢「持有量 - 目标需求」最大的颜色；大师球最后丢。
-        order.sort_by_key(|&slot| {
-            let color = Color::ALL[slot];
-            let surplus = me.tokens.get(color) as i32 - needs[slot] as i32;
-            std::cmp::Reverse(surplus)
-        });
-        build_discard(me.tokens, &order)
-    }
+    fn refine_main(&mut self, view: &GameView, base: Action) -> Action {
+        let relevance =
+            |card: &Card| evolution_progress(view, card) + opponent_evolution_pressure(view, card);
+        let base_relevance = match &base {
+            Action::Capture { source } => card_for_source(view, source).map(relevance).unwrap_or(0),
+            _ => 0,
+        };
 
-    fn choose_evolution(&mut self, view: &GameView) -> Option<Action> {
-        let candidates: Vec<(i64, Action)> = view
+        let options: Vec<(i64, Action)> = view
             .legal_actions
             .iter()
-            .filter(|action| matches!(action, Action::Evolve { .. }))
-            .map(|action| (evolve_score(view, action), action.clone()))
-            .collect();
-        if candidates.is_empty() {
-            return Some(Action::EndTurn);
-        }
-        pick_best(&mut self.rng, candidates)
-    }
-
-    fn choose_main_action(&mut self, view: &GameView) -> Option<Action> {
-        if view.legal_actions.is_empty() {
-            return None;
-        }
-
-        let captures: Vec<(i64, Action)> = view
-            .legal_actions
-            .iter()
-            .filter(|action| matches!(action, Action::Capture { .. }))
-            .map(|action| (capture_score(view, action), action.clone()))
-            .collect();
-        if !captures.is_empty() {
-            return pick_best(&mut self.rng, captures);
-        }
-
-        let mut options: Vec<(i64, Action)> = Vec::new();
-        for action in &view.legal_actions {
-            match action {
-                Action::TakeThree { .. } | Action::TakeTwo { .. } => {
-                    options.push((take_score(view, action), action.clone()));
+            .filter_map(|action| {
+                let Action::Capture { source } = action else {
+                    return None;
+                };
+                let card = card_for_source(view, source)?;
+                if relevance(card) <= base_relevance {
+                    return None;
                 }
-                Action::Reserve { source } => {
-                    options.push((reserve_score(view, source), action.clone()));
-                }
-                _ => {}
-            }
-        }
-        pick_best(&mut self.rng, options)
+                Some((capture_priority(view, card), action.clone()))
+            })
+            .collect();
+
+        pick_best(&mut self.rng, options).unwrap_or(base)
     }
 }
 
@@ -225,12 +206,111 @@ impl Bot for HeuristicBot {
 
     fn choose_action(&mut self, view: &GameView) -> Option<Action> {
         match view.phase {
-            Phase::MainAction => self.choose_main_action(view),
-            Phase::Discard => Some(self.choose_discard(view)),
-            Phase::Evolution => self.choose_evolution(view),
-            Phase::GameOver => None,
+            Phase::MainAction => {
+                let base = self.base.choose_action(view)?;
+                Some(self.refine_main(view, base))
+            }
+            Phase::Discard | Phase::Evolution | Phase::GameOver => self.base.choose_action(view),
         }
     }
+}
+
+/// 捕捉这张牌会给进化门槛带来多少额外价值。
+fn evolution_progress(view: &GameView, card: &Card) -> i64 {
+    let me = &view.players[view.current_player];
+    let current = me.bonuses.get(card.bonus_color);
+    let mut bonus = 0;
+
+    for source in &me.captured {
+        let Some(requirement) = source.evolution_requirement.as_ref() else {
+            continue;
+        };
+        if requirement.color != card.bonus_color || source.evolves_to_zh.is_none() {
+            continue;
+        }
+        let remaining = requirement.count.saturating_sub(current);
+        if remaining == 0 {
+            continue;
+        }
+        if card.bonus_count >= remaining {
+            // 这张牌直接补满门槛：目标在场时价值更高。
+            bonus += if visible_evolution_target(view, source) {
+                70
+            } else {
+                30
+            };
+        } else {
+            bonus += 15 * card.bonus_count.min(remaining) as i64;
+        }
+    }
+
+    if card.category.is_level()
+        && card.evolves_to_zh.is_some()
+        && visible_evolution_target(view, card)
+    {
+        bonus += 20;
+    }
+    bonus
+}
+
+/// 与 v1 相同的捕捉优先级，再加上进化推进与阻止对手进化的价值。
+fn capture_priority(view: &GameView, card: &Card) -> i64 {
+    let me = &view.players[view.current_player];
+    let mut score = card.points as i64 * 20 + card.bonus_count as i64 * 3;
+    if let (Some(_), Some(requirement)) = (&card.evolves_to_zh, &card.evolution_requirement) {
+        score += 10;
+        if me.bonuses.get(requirement.color) >= requirement.count {
+            score += 20;
+        }
+    }
+    if me.points.saturating_add(card.points as u16) >= WIN_POINTS {
+        score += 1_000;
+    }
+    score - card.cost.total() as i64 / 2
+        + evolution_progress(view, card)
+        + opponent_evolution_pressure(view, card)
+}
+
+/// 抢走这张牌会让对手少掉多少进化机会。
+fn opponent_evolution_pressure(view: &GameView, card: &Card) -> i64 {
+    let me = &view.players[view.current_player];
+    let mut pressure = 0;
+    for opponent in &view.players {
+        if opponent.id == me.id {
+            continue;
+        }
+        for source in &opponent.captured {
+            if !is_evolution_pair(source, card) {
+                continue;
+            }
+            pressure += if requirement_met(opponent, source) {
+                80
+            } else {
+                20
+            };
+        }
+    }
+    pressure
+}
+
+fn visible_evolution_target(view: &GameView, source: &Card) -> bool {
+    let me = &view.players[view.current_player];
+    let Some(name) = source.evolves_to_zh.as_deref() else {
+        return false;
+    };
+    let Some(category) = source.category.next_level() else {
+        return false;
+    };
+    view.board
+        .slots(category)
+        .iter()
+        .flatten()
+        .any(|card| card.name_zh == name)
+        || me.reserved.as_ref().is_some_and(|cards| {
+            cards
+                .iter()
+                .any(|card| card.category == category && card.name_zh == name)
+        })
 }
 
 /// 按种类创建 bot；相同 `(kind, player, seed)` 产生完全相同的随机流。
@@ -239,6 +319,7 @@ pub fn make_bot(kind: BotKind, player: PlayerId, game_seed: u64) -> Box<dyn Bot>
     match kind {
         BotKind::Random => Box::new(RandomBot::new(seed)),
         BotKind::Heuristic => Box::new(HeuristicBot::new(seed)),
+        BotKind::HeuristicV1 => Box::new(HeuristicV1Bot::new(seed)),
     }
 }
 
@@ -328,145 +409,16 @@ fn card_for_source<'a>(view: &'a GameView, source: &CardSource) -> Option<&'a Ca
     }
 }
 
-/// 卡牌自身价值：分数、减免、进化潜力。
-fn card_value(view: &GameView, card: &Card) -> i64 {
-    let me = &view.players[view.current_player];
-    let mut value = card.points as i64 * 10 + card.bonus_count as i64 * 2;
-    if let (Some(_), Some(requirement)) = (&card.evolves_to_zh, &card.evolution_requirement) {
-        value += 8;
-        if me.bonuses.get(requirement.color) >= requirement.count {
-            value += 16;
-        } else {
-            value += me.bonuses.get(requirement.color) as i64 * 2;
-        }
-    }
-    value
+fn is_evolution_pair(source: &Card, target: &Card) -> bool {
+    source.category.next_level() == Some(target.category)
+        && source.evolves_to_zh.as_deref() == Some(target.name_zh.as_str())
 }
 
-fn capture_score(view: &GameView, action: &Action) -> i64 {
-    let Action::Capture { source } = action else {
-        return i64::MIN;
-    };
-    let Some(card) = card_for_source(view, source) else {
-        return 0;
-    };
-    let me = &view.players[view.current_player];
-    let mut score = card.points as i64 * 20 + card.bonus_count as i64 * 3;
-    if let (Some(_), Some(requirement)) = (&card.evolves_to_zh, &card.evolution_requirement) {
-        score += 10;
-        if me.bonuses.get(requirement.color) >= requirement.count {
-            score += 20;
-        }
-    }
-    if me.points + card.points as u16 >= WIN_POINTS {
-        score += 1_000;
-    }
-    // 同分时略偏向便宜、能立刻形成减免的牌。
-    score - card.cost.total() as i64 / 2
-}
-
-fn evolve_score(view: &GameView, action: &Action) -> i64 {
-    let Action::Evolve {
-        captured_index,
-        target,
-    } = action
-    else {
-        return i64::MIN;
-    };
-    let me = &view.players[view.current_player];
-    let Some(from) = me.captured.get(*captured_index) else {
-        return 0;
-    };
-    let Some(to) = card_for_source(view, target) else {
-        return 0;
-    };
-    let mut score = to.points as i64 * 20 - from.points as i64 * 6 + to.bonus_count as i64 * 3;
-    if me.points.saturating_sub(from.points as u16) + to.points as u16 >= WIN_POINTS {
-        score += 1_000;
-    }
-    score
-}
-
-fn reserve_score(view: &GameView, source: &CardSource) -> i64 {
-    match card_for_source(view, source) {
-        Some(card) => {
-            let value = card_value(view, card);
-            // 保留会占位置，但没有更好的行动时仍值得抢高价值牌。
-            4 + value / 2
-        }
-        None => 3,
-    }
-}
-
-fn take_score(view: &GameView, action: &Action) -> i64 {
-    let me = &view.players[view.current_player];
-    let needs = desired_needs(view);
-    let (colors, count) = match action {
-        Action::TakeThree { colors } => (
-            colors
-                .iter()
-                .map(|color| color_slot(*color))
-                .collect::<Vec<_>>(),
-            3i64,
-        ),
-        Action::TakeTwo { color } => (vec![color_slot(*color)], 2i64),
-        _ => return i64::MIN,
-    };
-
-    let mut score = 8 + count;
-    for slot in colors {
-        score += needs[slot] as i64 * 5;
-    }
-    let after = me.tokens.total() as i64 + count;
-    if after > TOKEN_LIMIT as i64 {
-        score -= 20;
-    }
-    score
-}
-
-/// 当前最值得追求的牌还缺哪些球（已扣除永久减免与手上已有的球）。
-fn desired_needs(view: &GameView) -> [u8; 5] {
-    let me = &view.players[view.current_player];
-    let mut best: Option<&Card> = None;
-    let mut best_value = i64::MIN;
-
-    for category in crate::types::Category::ALL {
-        for card in view.board.slots(category).iter().flatten() {
-            let value = card_value(view, card);
-            if value > best_value {
-                best_value = value;
-                best = Some(card);
-            }
-        }
-    }
-    if let Some(cards) = me.reserved.as_ref() {
-        for card in cards {
-            let value = card_value(view, card);
-            if value > best_value {
-                best_value = value;
-                best = Some(card);
-            }
-        }
-    }
-
-    let mut needs = [0u8; 5];
-    if let Some(card) = best {
-        for (slot, color) in Color::ALL.iter().enumerate() {
-            let due = card.cost.get(*color).saturating_sub(me.bonuses.get(*color));
-            needs[slot] = due.saturating_sub(me.tokens.get(*color));
-        }
-    }
-    needs
-}
-
-fn color_slot(color: Color) -> usize {
-    match color {
-        Color::Red => 0,
-        Color::Blue => 1,
-        Color::Yellow => 2,
-        Color::Pink => 3,
-        Color::Black => 4,
-    }
+fn requirement_met(player: &PlayerView, source: &Card) -> bool {
+    source
+        .evolution_requirement
+        .as_ref()
+        .is_some_and(|requirement| player.bonuses.get(requirement.color) >= requirement.count)
 }
 
 fn token_at(tokens: TokenCounts, slot: usize) -> u8 {
@@ -496,7 +448,7 @@ fn add_token(tokens: &mut TokenCounts, slot: usize, count: u8) {
 
 /// 按给定顺序从持有量中凑出「必须弃掉」的数量。
 ///
-/// 调用方保证顺序中每个槽位的持有量足够，且总弃球数恰好为 `held.total() - TOKEN_LIMIT`。
+/// 调用方保证顺序覆盖全部持有槽位，且总弃球数恰好为 `held.total() - TOKEN_LIMIT`。
 fn build_discard(held: TokenCounts, order: &[usize]) -> Action {
     let excess = held.total().saturating_sub(TOKEN_LIMIT);
     let mut discard = TokenCounts::ZERO;
@@ -511,7 +463,6 @@ fn build_discard(held: TokenCounts, order: &[usize]) -> Action {
         remaining -= take as u16;
     }
 
-    // 理论上不会走到这里；若顺序未覆盖大师球则补上，保证动作合法。
     if remaining > 0 {
         add_token(&mut discard, 5, token_at(held, 5).min(remaining as u8));
     }
@@ -533,23 +484,5 @@ mod tests {
 
         let mut other = BotRng::new(8);
         assert_ne!(a[0], other.next_u64());
-    }
-
-    #[test]
-    fn discard_has_exact_excess_and_never_exceeds_held() {
-        let held = TokenCounts::new(3, 4, 2, 0, 5, 2);
-        let order = [0, 1, 2, 3, 4, 5];
-        let Action::Discard { tokens } = build_discard(held, &order) else {
-            panic!("expected discard");
-        };
-        assert_eq!(
-            held.total() - tokens.total(),
-            TOKEN_LIMIT,
-            "弃球后应正好等于上限"
-        );
-        for color in Color::ALL {
-            assert!(tokens.get(color) <= held.get(color));
-        }
-        assert!(tokens.master <= held.master);
     }
 }

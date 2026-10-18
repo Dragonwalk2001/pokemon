@@ -10,6 +10,7 @@ pub mod bot;
 pub mod catalog;
 pub mod error;
 pub mod game;
+pub mod heuristic_v1;
 pub mod replay;
 pub mod types;
 pub mod view;
@@ -24,6 +25,7 @@ pub use game::{
     Board, Decks, Game, BOARD_SLOTS, MAX_PLAYERS, MAX_RESERVED, MIN_PLAYERS, TOKEN_LIMIT,
     WIN_POINTS,
 };
+pub use heuristic_v1::HeuristicV1Bot;
 pub use replay::{Replay, ReplayFrame, ReplayRecorder, ReplayResult, REPLAY_VERSION};
 pub use types::{
     Action, Card, CardId, CardSource, Category, Color, Event, EvolutionRequirement, Phase, Player,

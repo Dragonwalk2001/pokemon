@@ -17,7 +17,7 @@ pub struct Replay {
     pub version: u32,
     pub seed: u64,
     pub players: Vec<String>,
-    /// 与 `players` 一一对应：`human` / `random` / `heuristic`。
+    /// 与 `players` 一一对应：`human` / `random` / `heuristic` / `heuristic-v1`。
     pub controllers: Vec<String>,
     pub frames: Vec<ReplayFrame>,
     pub result: Option<ReplayResult>,

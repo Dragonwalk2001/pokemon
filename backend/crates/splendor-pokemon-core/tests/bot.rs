@@ -104,6 +104,29 @@ fn hundred_heuristic_games_complete() {
 }
 
 #[test]
+fn heuristic_v1_completes_protocol_seeds() {
+    // 回测基线在官方 20 个种子上必须能正常终局。
+    for seed in 1..=20u64 {
+        let replay = play_bot_game(
+            names(2),
+            seed,
+            &[BotKind::HeuristicV1, BotKind::HeuristicV1],
+        )
+        .unwrap_or_else(|error| panic!("baseline seed {seed} failed: {error}"));
+        assert!(replay.result.is_some(), "baseline seed {seed} must finish");
+    }
+}
+
+#[test]
+fn bot_kind_parses_versions() {
+    assert_eq!(BotKind::parse("heuristic"), Some(BotKind::Heuristic));
+    assert_eq!(BotKind::parse("heuristic-v1"), Some(BotKind::HeuristicV1));
+    assert_eq!(BotKind::parse("v1"), Some(BotKind::HeuristicV1));
+    assert_eq!(BotKind::parse("random"), Some(BotKind::Random));
+    assert_eq!(BotKind::parse("unknown"), None);
+}
+
+#[test]
 fn pve_style_game_completes() {
     // 玩家 0 用启发式代替人类席位，后两名是 bot；与 CLI `pve --auto` 走同一条 runner。
     let replay = play_bot_game(
