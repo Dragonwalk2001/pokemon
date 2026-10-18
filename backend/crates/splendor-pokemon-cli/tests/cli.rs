@@ -89,6 +89,66 @@ fn bot_vs_bot_finishes_and_writes_offline_replay() {
 }
 
 #[test]
+fn arena_debug_mode_runs_twenty_seeds_with_swapped_seats() {
+    let output = run(&[
+        "arena",
+        "--candidate",
+        "heuristic",
+        "--baseline",
+        "heuristic-v1",
+        "--seeds",
+        "20",
+        "--seed-start",
+        "1",
+        "--require",
+        "0",
+    ]);
+    assert_success(&output);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("自定义调试种子（1–20，不消耗增量游标） × 先后手互换 = 40 局"),
+        "arena must run the requested debug range, got:\n{stdout}"
+    );
+    assert!(stdout.contains("得分率"));
+    assert!(stdout.contains("先手："));
+    assert!(stdout.contains("后手："));
+    assert!(stdout.contains("判定：通过"));
+}
+
+#[test]
+fn arena_official_mode_advances_incremental_ledger() {
+    let dir = tmp_dir();
+    let ledger = dir.join(format!("cli-arena-seeds-{}.txt", std::process::id()));
+    fs::write(&ledger, "21\n").expect("write ledger");
+
+    let output = run(&[
+        "arena",
+        "--candidate",
+        "heuristic",
+        "--baseline",
+        "heuristic-v1",
+        "--ledger",
+        ledger.to_str().unwrap(),
+    ]);
+    assert_success(&output);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("10 个固定种子（1–10）+ 10 个增量种子（21–30）"),
+        "official arena must use fixed + incremental seeds, got:\n{stdout}"
+    );
+    assert!(stdout.contains("固定种子："));
+    assert!(stdout.contains("增量种子："));
+    assert!(stdout.contains("下一轮从 31 开始"));
+
+    let next = fs::read_to_string(&ledger).expect("read ledger");
+    assert_eq!(next.trim(), "31", "ledger must advance by one block");
+
+    let _ = fs::remove_file(ledger);
+}
+
+#[test]
 fn pve_auto_finishes_and_records_replay() {
     let dir = tmp_dir();
     let stem = format!("cli-pve-{}", std::process::id());

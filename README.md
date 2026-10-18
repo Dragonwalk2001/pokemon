@@ -74,6 +74,7 @@ cargo run -p splendor-pokemon-cli -- pve --bots 2 --seed 42
 - 你是玩家 0，其余是 `Bot1`、`Bot2`；`--bots 3` 则为 1 人 vs 3 bot。
 - bot 回合自动执行，轮到你时出现 `你>` 提示符。
 - `--bot random` 可把 bot 换成随机策略（默认 `heuristic` 启发式）。
+- `--bot heuristic-v1` 是冻结的旧版启发式，仅用于回测对照。
 - 终局后自动写入仓库根目录：`tmp/pve-42-3p.json` 和 `.html`（`3p` = 1 人 + 2 bot）。
 
 演示或测试时，可以让启发式 bot 代替你的席位自动打完：
@@ -123,14 +124,29 @@ cargo run -p splendor-pokemon-cli -- bot-vs-bot --players 3 --seed 42 \
 | 参数 | 说明 |
 |---|---|
 | `--players 2\|3\|4` | 玩家人数，默认 2 |
-| `--bot heuristic\|random` | bot 策略，默认 `heuristic` |
+| `--bot heuristic\|heuristic-v1\|random` | bot 策略，默认 `heuristic` |
 | `--seed N` | 随机种子，默认 42；同 seed + 同策略结果完全一致 |
 | `--replay <file>` | 回放 JSON 路径 |
 | `--html <file>` | 回放 HTML 路径 |
 
 JSON 的 `frames` 逐动作保存 `(Action, GameView)`；`result` 为胜者与分数，规则僵局时 `stalemate` 为 `true`。
 
-## 3. 可视化结果
+## 3. AI 回测
+
+固定赛制：2 人、10 个固定种子（1–10）+ 10 个增量种子，每个种子交换先后手各一局，共 40 局。候选得分率必须 ≥ 50%。
+
+```bash
+cargo run -p splendor-pokemon-cli -- arena \
+  --candidate heuristic --baseline heuristic-v1 \
+  --require 50
+```
+
+官方模式会自动读取 `backend/arena-seeds.txt` 中的增量游标，跑完后把游标推进 10；游标文件随仓库提交，禁止重置或回退。调试可用 `--seeds N --seed-start M`，但不会消耗游标，也不能作为改动依据。
+
+输出包含胜-负-平、得分率、固定/增量种子分项、双方平均分、先/后手分项与僵局数。`--verbose` 可逐局打印；`heuristic-v1` 是冻结的回测基线。
+
+
+## 4. 可视化结果
 
 `bot-vs-bot` 和 PvE 都会同时生成 HTML，直接双击打开即可，或者：
 

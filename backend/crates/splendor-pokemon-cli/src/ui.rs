@@ -10,12 +10,15 @@ pub(crate) fn print_usage() {
 用法:
   splendor-pokemon [--players 2|3|4] [--names 名字1,名字2,...] [--seed N]
       本地热座对局（默认 2 人，seed 42）
-  splendor-pokemon pve [--bots 2|3] [--bot heuristic|random] [--name 名字] [--seed N]
+  splendor-pokemon pve [--bots 2|3] [--bot heuristic|heuristic-v1|random] [--name 名字] [--seed N]
                        [--replay out.json] [--html out.html] [--auto]
       1 人 + 2–3 个 bot；--auto 让人类席位由启发式 bot 代打（演示 / 测试）
-  splendor-pokemon bot-vs-bot [--players 2|3|4] [--bot heuristic|random] [--seed N]
+  splendor-pokemon bot-vs-bot [--players 2|3|4] [--bot heuristic|heuristic-v1|random] [--seed N]
                               [--replay out.json] [--html out.html]
       全部由 bot 对局，默认记录到 tmp/bot-<seed>-<n>p.json / .html
+  splendor-pokemon arena [--candidate <bot>] [--baseline <bot>] [--require 50] [--verbose]
+                         [--seeds N --seed-start M | --ledger path]
+      官方回测：10 个固定种子 + 10 个增量种子 = 40 局；调试模式不消耗游标
   splendor-pokemon replay <replay.json> [--html out.html]
       把回放 JSON 渲染为自包含 HTML"
     );

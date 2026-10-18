@@ -1,5 +1,6 @@
-//! CLI 入口：默认热座对局，另有 PvE、bot-vs-bot 与回放渲染子命令。
+//! CLI 入口：默认热座对局，另有 PvE、bot-vs-bot、arena 回测与回放渲染子命令。
 
+mod arena;
 mod bot_cmd;
 mod html;
 mod pve;
@@ -17,6 +18,7 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("pve") => pve::run(&args[1..]),
         Some("bot-vs-bot") | Some("bots") => bot_cmd::run_bots(&args[1..]),
+        Some("arena") | Some("bench") => arena::run(&args[1..]),
         Some("replay") | Some("html") => bot_cmd::run_render(&args[1..]),
         Some("--help") | Some("-h") => {
             ui::print_usage();

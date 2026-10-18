@@ -7,6 +7,7 @@
 ```text
 backend/
 ├── Cargo.toml                       # workspace
+├── arena-seeds.txt                  # 增量种子游标（官方回测自动推进）
 └── crates/
     ├── splendor-pokemon-core/       # 规则引擎（库）
     │   ├── src/catalog.rs           # 编译期解析 data/cards.csv
@@ -14,12 +15,14 @@ backend/
     │   ├── src/types.rs             # 卡牌、动作、事件、资源类型
     │   ├── src/view.rs              # 按查看者过滤私有信息的只读视图
     │   ├── src/bot.rs               # 可复现的随机 / 启发式 bot
+    │   ├── src/heuristic_v1.rs      # 冻结的启发式 v1（回测基线）
     │   ├── src/replay.rs            # 逐动作回放时间线与 JSON
     │   └── tests/                   # 卡牌数据、公开 API、bot 测试
     └── splendor-pokemon-cli/        # 对局 CLI
         ├── src/main.rs              # 子命令分发与热座对局
         ├── src/pve.rs               # 1 人 + 2–3 bot
         ├── src/bot_cmd.rs           # bot-vs-bot / replay 子命令
+        ├── src/arena.rs              # 固定 20 种子 × 先后手互换的 40 局回测
         ├── src/html.rs              # 回放 JSON → 自包含 HTML
         ├── src/ui.rs                # 终端渲染与命令解析
         ├── assets/replay.html       # 内嵌 CSS / JS 的离线回放模板
@@ -50,6 +53,11 @@ cargo run -p splendor-pokemon-cli -- pve --bots 2 --auto --seed 42
 # bot-vs-bot：默认写 tmp/bot-<seed>-<n>p.json 与同名 .html
 cargo run -p splendor-pokemon-cli -- bot-vs-bot --players 3 --seed 42 \
   --replay tmp/replay.json --html tmp/replay.html
+
+# 40 局回测：10 个固定种子 + 10 个增量种子，先后手互换
+cargo run -p splendor-pokemon-cli -- arena \
+  --candidate heuristic --baseline heuristic-v1 \
+  --require 50
 
 # 把已有回放 JSON 重新渲染成 HTML
 cargo run -p splendor-pokemon-cli -- replay tmp/replay.json --html tmp/replay.html
@@ -92,7 +100,8 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 
 ## Bot 与回放
 
-- **策略**：`RandomBot` 在合法动作中均匀随机；`HeuristicBot` 优先捕捉高分 / 可进化 / 能直接获胜的牌，否则按目标牌缺口拿球，或保留高价值牌。弃球阶段 `legal_actions()` 为空，bot 自行构造恰好降到 10 个的合法弃球。
+- **策略**：`RandomBot` 在合法动作中均匀随机；`HeuristicBot` 以 `heuristic-v1` 为底座，只在捕捉选择上加入「推进自己的进化门槛 / 阻止对手进化」的评分；`HeuristicV1Bot` 是冻结的回测基线，不参与默认对局。
+- **回测**：`arena` 官方模式使用 10 个固定种子（1–10）+ 10 个增量种子，每个种子交换先后手，共 40 局 2 人对局；增量游标保存在 `backend/arena-seeds.txt`，完整跑完后自动前进 10。输出胜-负-平、得分率、固定/增量种子分项、双方平均分、先/后手分项与僵局数。`--require 50` 在得分率低于门槛或出现僵局时返回失败。调试用 `--seeds N --seed-start M`，不消耗游标。完整规矩见 [`.clinerules/ai-backtest.md`](../.clinerules/ai-backtest.md)。
 - **可复现**：bot 使用独立 `BotRng`（SplitMix64），种子由 `derive_seed(game_seed, player_id)` 派生；同一 seed + 同一 bot 组合产生逐字节一致的回放。分数相同的候选由种子随机打破平局。
 - **只读决策**：bot 只接收 `GameView`，与未来 HTTP / Godot 客户端使用同一信息边界；不修改规则语义。
 - **回放结构**：`Replay { version, seed, players, controllers, frames, result, stalemate }`。`frames[0]` 是开局视图，之后每帧保存 `actor + Action + GameView + 本步事件文本`。为避免整局日志在每帧重复，帧内 `view.log` 只保留本步新增事件。
@@ -122,6 +131,6 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 ## 尚未实现
 
 - 联网、PvP、HTTP / WebSocket 接口与房间、账号体系。
-- 更强的 bot 策略（当前只有随机与简单启发式）。
+- 搜索 / 学习型 bot（当前为启发式 + 定向改写，未做博弈搜索）。
 - 角色立牌的特殊能力（规则文档未提供角色效果数据，当前只记录进化次数用于平手判定）。
 - 卡图与 Godot 前端资源（回放 JSON 已按可复用格式输出）。

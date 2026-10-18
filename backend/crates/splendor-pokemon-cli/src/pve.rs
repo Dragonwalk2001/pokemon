@@ -225,8 +225,9 @@ impl Config {
                 "--bot" => {
                     index += 1;
                     let value = args.get(index).ok_or("--bot 缺少数值")?;
-                    bot = BotKind::parse(value)
-                        .ok_or_else(|| format!("未知 bot {value:?}，可用 heuristic / random"))?;
+                    bot = BotKind::parse(value).ok_or_else(|| {
+                        format!("未知 bot {value:?}，可用 heuristic / heuristic-v1 / random")
+                    })?;
                 }
                 "--name" => {
                     index += 1;
