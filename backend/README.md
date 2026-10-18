@@ -1,6 +1,6 @@
 # 璀璨宝石：宝可梦 — Rust 后端
 
-当前形态：**规则引擎库 + 交互式 CLI**。HTTP / WebSocket 服务尚未实现。
+当前形态：**规则引擎库 + 交互式 CLI + 离线 bot / HTML 回放**。HTTP / WebSocket 服务尚未实现，不含联网与 PvP。
 
 ## 目录
 
@@ -13,8 +13,17 @@ backend/
     │   ├── src/game.rs              # 权威状态机
     │   ├── src/types.rs             # 卡牌、动作、事件、资源类型
     │   ├── src/view.rs              # 按查看者过滤私有信息的只读视图
-    │   └── tests/                   # 卡牌数据与公开 API 测试
-    └── splendor-pokemon-cli/        # 交互式对局 CLI
+    │   ├── src/bot.rs               # 可复现的随机 / 启发式 bot
+    │   ├── src/replay.rs            # 逐动作回放时间线与 JSON
+    │   └── tests/                   # 卡牌数据、公开 API、bot 测试
+    └── splendor-pokemon-cli/        # 对局 CLI
+        ├── src/main.rs              # 子命令分发与热座对局
+        ├── src/pve.rs               # 1 人 + 2–3 bot
+        ├── src/bot_cmd.rs           # bot-vs-bot / replay 子命令
+        ├── src/html.rs              # 回放 JSON → 自包含 HTML
+        ├── src/ui.rs                # 终端渲染与命令解析
+        ├── assets/replay.html       # 内嵌 CSS / JS 的离线回放模板
+        └── tests/cli.rs             # CLI 端到端冒烟测试
 ```
 
 数据源是仓库根目录的 `data/cards.csv`（编译期 `include_str!` 嵌入）与 `data/rules.md`。
@@ -26,14 +35,27 @@ backend/
 ```bash
 cd backend
 
-# 3 名玩家，固定随机种子
+# 本地热座：3 名玩家，固定随机种子
 cargo run -p splendor-pokemon-cli -- --players 3 --seed 42
 
 # 指定名字（人数由名字数量决定）
 cargo run -p splendor-pokemon-cli -- --names Alice,Bob,Carol
 
+# PvE：1 人 + 2 个启发式 bot，终端交互
+cargo run -p splendor-pokemon-cli -- pve --bots 2 --seed 42
+
+# PvE 演示 / 测试：人类席位由启发式 bot 代打，可离开终端跑完
+cargo run -p splendor-pokemon-cli -- pve --bots 2 --auto --seed 42
+
+# bot-vs-bot：默认写 tmp/bot-<seed>-<n>p.json 与同名 .html
+cargo run -p splendor-pokemon-cli -- bot-vs-bot --players 3 --seed 42 \
+  --replay tmp/replay.json --html tmp/replay.html
+
+# 把已有回放 JSON 重新渲染成 HTML
+cargo run -p splendor-pokemon-cli -- replay tmp/replay.json --html tmp/replay.html
+
 # 测试
-cargo test
+cargo test --workspace
 ```
 
 当前工作副本在项目根 `.rust/` 准备了隔离工具链（`.gitignore` 忽略，不随仓库分发）。若 PATH 中没有 `cargo`，在仓库根执行：
@@ -68,6 +90,16 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 | `save <path>` / `load <path>` | 保存/读取完整对局 JSON（含目录与牌堆） |
 | `quit` | 退出 |
 
+## Bot 与回放
+
+- **策略**：`RandomBot` 在合法动作中均匀随机；`HeuristicBot` 优先捕捉高分 / 可进化 / 能直接获胜的牌，否则按目标牌缺口拿球，或保留高价值牌。弃球阶段 `legal_actions()` 为空，bot 自行构造恰好降到 10 个的合法弃球。
+- **可复现**：bot 使用独立 `BotRng`（SplitMix64），种子由 `derive_seed(game_seed, player_id)` 派生；同一 seed + 同一 bot 组合产生逐字节一致的回放。分数相同的候选由种子随机打破平局。
+- **只读决策**：bot 只接收 `GameView`，与未来 HTTP / Godot 客户端使用同一信息边界；不修改规则语义。
+- **回放结构**：`Replay { version, seed, players, controllers, frames, result, stalemate }`。`frames[0]` 是开局视图，之后每帧保存 `actor + Action + GameView + 本步事件文本`。为避免整局日志在每帧重复，帧内 `view.log` 只保留本步新增事件。
+- **规则僵局**：3 人局可能把普通球全部持有到供应区只剩大师球，此时若当前玩家无牌可捕捉，引擎没有合法主行动且规则未定义 pass。回放以 `stalemate: true`、无胜者收尾，不新增动作、不改变规则语义。
+- **输出位置**：`pve` / `bot-vs-bot` 默认写 `tmp/pve-<seed>-<n>p.*` 或 `tmp/bot-<seed>-<n>p.*`；`--replay` / `--html` 可覆盖。`tmp/` 已被 `.gitignore` 忽略。
+- **HTML 回放**：单个文件内嵌全部 CSS / JS / JSON，不引用 CDN、字体或图片，`file://` 直接打开。支持上一步 / 下一步 / 自动播放 / 速度 / 进度条 / 键盘方向键，展示场上牌、供应区、各玩家球与减免、分数、保留数、最近动作与终局横幅。选 HTML 而非 ratatui：无需额外终端依赖、卡片信息密度更高、可截图分享，且同一份回放 JSON 后续可直接给 Godot 使用。
+
 ## 规则覆盖
 
 - 2–4 人初始化：普通球每种 4 / 5 / 7 个，大师球 5 个；1/2/3 阶各翻 4 张，稀有与传说各 1 张。
@@ -89,7 +121,7 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 
 ## 尚未实现
 
-- HTTP / WebSocket 接口与房间、账号体系。
-- AI 对手。
+- 联网、PvP、HTTP / WebSocket 接口与房间、账号体系。
+- 更强的 bot 策略（当前只有随机与简单启发式）。
 - 角色立牌的特殊能力（规则文档未提供角色效果数据，当前只记录进化次数用于平手判定）。
-- 卡图与前端资源。
+- 卡图与 Godot 前端资源（回放 JSON 已按可复用格式输出）。

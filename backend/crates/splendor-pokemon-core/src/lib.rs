@@ -6,18 +6,25 @@
 //!
 //! 数据在编译期通过 `include_str!` 嵌入，运行时不依赖工作目录。
 
+pub mod bot;
 pub mod catalog;
 pub mod error;
 pub mod game;
+pub mod replay;
 pub mod types;
 pub mod view;
 
+pub use bot::{
+    derive_seed, make_bot, play_bot_game, Bot, BotKind, BotRng, HeuristicBot, RandomBot,
+    MAX_BOT_STEPS,
+};
 pub use catalog::Catalog;
 pub use error::{CatalogError, GameError};
 pub use game::{
     Board, Decks, Game, BOARD_SLOTS, MAX_PLAYERS, MAX_RESERVED, MIN_PLAYERS, TOKEN_LIMIT,
     WIN_POINTS,
 };
+pub use replay::{Replay, ReplayFrame, ReplayRecorder, ReplayResult, REPLAY_VERSION};
 pub use types::{
     Action, Card, CardId, CardSource, Category, Color, Event, EvolutionRequirement, Phase, Player,
     PlayerId, TokenCounts,
