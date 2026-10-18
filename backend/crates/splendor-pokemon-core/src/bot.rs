@@ -2,6 +2,7 @@
 //!
 //! - [`RandomBot`]：在合法动作中均匀随机；弃球阶段由 bot 自行构造合法弃球。
 //! - [`HeuristicBot`]：以 v1 为底座，只在捕捉选择上加入进化推进与反制。
+//! - [`MinimaxBot`](crate::minimax::MinimaxBot)：在公开信息模拟上做 alpha-beta 搜索。
 //! - [`HeuristicV1Bot`](crate::heuristic_v1::HeuristicV1Bot)：冻结的回测对照组。
 //!
 //! 所有随机数来自 [`BotRng`]，种子由对局 seed 与玩家 ID 派生，同一 seed 可完整复现。
@@ -70,6 +71,7 @@ pub fn derive_seed(seed: u64, player: PlayerId) -> u64 {
 pub enum BotKind {
     Random,
     Heuristic,
+    Minimax,
     HeuristicV1,
 }
 
@@ -78,6 +80,7 @@ impl BotKind {
         match self {
             BotKind::Random => "random",
             BotKind::Heuristic => "heuristic",
+            BotKind::Minimax => "minimax",
             BotKind::HeuristicV1 => "heuristic-v1",
         }
     }
@@ -86,6 +89,7 @@ impl BotKind {
         match self {
             BotKind::Random => "随机 bot",
             BotKind::Heuristic => "启发式 bot",
+            BotKind::Minimax => "极小化极大搜索 bot",
             BotKind::HeuristicV1 => "启发式 v1（回测基线）",
         }
     }
@@ -94,6 +98,7 @@ impl BotKind {
         match input.trim().to_ascii_lowercase().as_str() {
             "random" | "rand" | "随机" => Some(BotKind::Random),
             "heuristic" | "smart" | "启发" | "启发式" => Some(BotKind::Heuristic),
+            "minimax" | "search" | "搜索" | "极小化极大" => Some(BotKind::Minimax),
             "heuristic-v1" | "heuristic_v1" | "v1" | "baseline" | "基线" => {
                 Some(BotKind::HeuristicV1)
             }
@@ -319,6 +324,7 @@ pub fn make_bot(kind: BotKind, player: PlayerId, game_seed: u64) -> Box<dyn Bot>
     match kind {
         BotKind::Random => Box::new(RandomBot::new(seed)),
         BotKind::Heuristic => Box::new(HeuristicBot::new(seed)),
+        BotKind::Minimax => Box::new(crate::minimax::MinimaxBot::new(seed)),
         BotKind::HeuristicV1 => Box::new(HeuristicV1Bot::new(seed)),
     }
 }

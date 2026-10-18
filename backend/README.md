@@ -15,6 +15,7 @@ backend/
     │   ├── src/types.rs             # 卡牌、动作、事件、资源类型
     │   ├── src/view.rs              # 按查看者过滤私有信息的只读视图
     │   ├── src/bot.rs               # 可复现的随机 / 启发式 bot
+    │   ├── src/minimax.rs           # 极小化极大搜索 bot（捕捉阶段）
     │   ├── src/heuristic_v1.rs      # 冻结的启发式 v1（回测基线）
     │   ├── src/replay.rs            # 逐动作回放时间线与 JSON
     │   └── tests/                   # 卡牌数据、公开 API、bot 测试
@@ -56,7 +57,7 @@ cargo run -p splendor-pokemon-cli -- bot-vs-bot --players 3 --seed 42 \
 
 # 40 局回测：10 个固定种子 + 10 个增量种子，先后手互换
 cargo run -p splendor-pokemon-cli -- arena \
-  --candidate heuristic --baseline heuristic-v1 \
+  --candidate minimax --baseline heuristic-v1 \
   --require 50
 
 # 把已有回放 JSON 重新渲染成 HTML
@@ -100,7 +101,8 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 
 ## Bot 与回放
 
-- **策略**：`RandomBot` 在合法动作中均匀随机；`HeuristicBot` 以 `heuristic-v1` 为底座，只在捕捉选择上加入「推进自己的进化门槛 / 阻止对手进化」的评分；`HeuristicV1Bot` 是冻结的回测基线，不参与默认对局。
+- **策略**：默认对局使用 `MinimaxBot`，它在出现捕捉机会时用公开信息模拟对局并跑 alpha-beta 极小化极大搜索（默认看 5 个回合），拿球 / 保留 / 弃球 / 进化沿用启发式底座；`HeuristicBot` 以 `heuristic-v1` 为底座，只在捕捉选择上加入「推进自己的进化门槛 / 阻止对手进化」的评分；`RandomBot` 在合法动作中均匀随机；`HeuristicV1Bot` 是冻结的回测基线，不参与默认对局。
+- **搜索边界**：`MinimaxBot` 只用 `GameView` 的公开信息，对手保留牌只保留数量，牌堆顶不可见且模拟中不补牌；搜索固定深度与分支宽度，不读墙钟时间，同一 seed 可逐字节复现。规则层僵局按平局评估，避免搜索把「让对手无行动」误判为优势。
 - **回测**：`arena` 官方模式使用 10 个固定种子（1–10）+ 10 个增量种子，每个种子交换先后手，共 40 局 2 人对局；增量游标保存在 `backend/arena-seeds.txt`，完整跑完后自动前进 10。输出胜-负-平、得分率、固定/增量种子分项、双方平均分、先/后手分项与僵局数。`--require 50` 在得分率低于门槛或出现僵局时返回失败。调试用 `--seeds N --seed-start M`，不消耗游标。完整规矩见 [`.clinerules/ai-backtest.md`](../.clinerules/ai-backtest.md)。
 - **可复现**：bot 使用独立 `BotRng`（SplitMix64），种子由 `derive_seed(game_seed, player_id)` 派生；同一 seed + 同一 bot 组合产生逐字节一致的回放。分数相同的候选由种子随机打破平局。
 - **只读决策**：bot 只接收 `GameView`，与未来 HTTP / Godot 客户端使用同一信息边界；不修改规则语义。

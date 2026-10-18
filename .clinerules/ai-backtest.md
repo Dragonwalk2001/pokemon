@@ -17,7 +17,7 @@
 
 ```bash
 cargo run -p splendor-pokemon-cli -- arena \
-  --candidate heuristic --baseline heuristic-v1 \
+  --candidate minimax --baseline heuristic-v1 \
   --require 50
 ```
 
@@ -42,6 +42,6 @@ cargo run -p splendor-pokemon-cli -- arena \
 
 ## 基线
 
-- `heuristic-v1` 是冻结的对照组，不随默认策略调整；日常只改默认的 `heuristic`。
+- `heuristic-v1` 是冻结的对照组，不随默认策略调整；日常只改默认的 `minimax`（`heuristic` 保留为启发式对照）。
 - 需要更换基线时，先让新基线在同一赛制下完成一轮完整回测，再同步更新本文件与 `BotKind` 的取值。
 

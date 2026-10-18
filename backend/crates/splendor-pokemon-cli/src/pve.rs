@@ -193,7 +193,7 @@ impl Config {
     fn from_args(args: &[String]) -> Result<Option<Self>, String> {
         let mut seed = 42u64;
         let mut bots = 2usize;
-        let mut bot = BotKind::Heuristic;
+        let mut bot = BotKind::Minimax;
         let mut name = "你".to_string();
         let mut auto = false;
         let mut replay: Option<PathBuf> = None;
@@ -226,7 +226,9 @@ impl Config {
                     index += 1;
                     let value = args.get(index).ok_or("--bot 缺少数值")?;
                     bot = BotKind::parse(value).ok_or_else(|| {
-                        format!("未知 bot {value:?}，可用 heuristic / heuristic-v1 / random")
+                        format!(
+                            "未知 bot {value:?}，可用 heuristic / minimax / heuristic-v1 / random"
+                        )
                     })?;
                 }
                 "--name" => {

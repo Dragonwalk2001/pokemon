@@ -118,8 +118,43 @@ fn heuristic_v1_completes_protocol_seeds() {
 }
 
 #[test]
+fn minimax_completes_protocol_seeds_without_stalemate() {
+    // 固定种子上先后手各跑一局，确保搜索不会把对局拖入规则僵局。
+    for seed in 1..=10u64 {
+        for candidate_first in [true, false] {
+            let styles = if candidate_first {
+                [BotKind::Minimax, BotKind::HeuristicV1]
+            } else {
+                [BotKind::HeuristicV1, BotKind::Minimax]
+            };
+            let replay = play_bot_game(names(2), seed, &styles).unwrap_or_else(|error| {
+                panic!("minimax seed {seed} first={candidate_first} failed: {error}")
+            });
+            assert!(
+                replay.result.is_some(),
+                "minimax seed {seed} first={candidate_first} ended in stalemate"
+            );
+        }
+    }
+}
+
+#[test]
+fn minimax_replay_is_reproducible() {
+    let styles = [BotKind::Minimax, BotKind::HeuristicV1];
+    let first = play_bot_game(names(2), 440, &styles).expect("first game");
+    let second = play_bot_game(names(2), 440, &styles).expect("second game");
+    assert_eq!(
+        first.to_json().expect("serialise first"),
+        second.to_json().expect("serialise second"),
+        "同一 seed 的 minimax 回放必须逐字节一致"
+    );
+}
+
+#[test]
 fn bot_kind_parses_versions() {
     assert_eq!(BotKind::parse("heuristic"), Some(BotKind::Heuristic));
+    assert_eq!(BotKind::parse("minimax"), Some(BotKind::Minimax));
+    assert_eq!(BotKind::parse("search"), Some(BotKind::Minimax));
     assert_eq!(BotKind::parse("heuristic-v1"), Some(BotKind::HeuristicV1));
     assert_eq!(BotKind::parse("v1"), Some(BotKind::HeuristicV1));
     assert_eq!(BotKind::parse("random"), Some(BotKind::Random));

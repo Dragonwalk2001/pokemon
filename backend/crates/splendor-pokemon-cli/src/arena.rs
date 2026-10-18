@@ -326,7 +326,7 @@ struct Config {
 
 impl Config {
     fn from_args(args: &[String]) -> Result<Option<Self>, String> {
-        let mut candidate = BotKind::Heuristic;
+        let mut candidate = BotKind::Minimax;
         let mut baseline = BotKind::HeuristicV1;
         let mut seeds: Option<u64> = None;
         let mut seed_start: Option<u64> = None;
@@ -345,14 +345,14 @@ impl Config {
                     index += 1;
                     let value = args.get(index).ok_or("--candidate 缺少数值")?;
                     candidate = BotKind::parse(value).ok_or_else(|| {
-                        format!("未知候选 bot {value:?}，可用 heuristic / heuristic-v1 / random")
+                        format!("未知候选 bot {value:?}，可用 heuristic / minimax / heuristic-v1 / random")
                     })?;
                 }
                 "--baseline" => {
                     index += 1;
                     let value = args.get(index).ok_or("--baseline 缺少数值")?;
                     baseline = BotKind::parse(value).ok_or_else(|| {
-                        format!("未知基线 bot {value:?}，可用 heuristic / heuristic-v1 / random")
+                        format!("未知基线 bot {value:?}，可用 heuristic / minimax / heuristic-v1 / random")
                     })?;
                 }
                 "--seeds" => {

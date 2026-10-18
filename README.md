@@ -73,7 +73,9 @@ cargo run -p splendor-pokemon-cli -- pve --bots 2 --seed 42
 
 - 你是玩家 0，其余是 `Bot1`、`Bot2`；`--bots 3` 则为 1 人 vs 3 bot。
 - bot 回合自动执行，轮到你时出现 `你>` 提示符。
-- `--bot random` 可把 bot 换成随机策略（默认 `heuristic` 启发式）。
+- `--bot random` 可把 bot 换成随机策略（默认 `minimax` 搜索策略）。
+- `--bot heuristic` 使用旧的启发式策略。
+- `--bot minimax` 使用极小化极大搜索策略（捕捉阶段展开搜索树）。
 - `--bot heuristic-v1` 是冻结的旧版启发式，仅用于回测对照。
 - 终局后自动写入仓库根目录：`tmp/pve-42-3p.json` 和 `.html`（`3p` = 1 人 + 2 bot）。
 
@@ -124,7 +126,7 @@ cargo run -p splendor-pokemon-cli -- bot-vs-bot --players 3 --seed 42 \
 | 参数 | 说明 |
 |---|---|
 | `--players 2\|3\|4` | 玩家人数，默认 2 |
-| `--bot heuristic\|heuristic-v1\|random` | bot 策略，默认 `heuristic` |
+| `--bot heuristic\|minimax\|heuristic-v1\|random` | bot 策略，默认 `minimax` |
 | `--seed N` | 随机种子，默认 42；同 seed + 同策略结果完全一致 |
 | `--replay <file>` | 回放 JSON 路径 |
 | `--html <file>` | 回放 HTML 路径 |
@@ -137,13 +139,13 @@ JSON 的 `frames` 逐动作保存 `(Action, GameView)`；`result` 为胜者与�
 
 ```bash
 cargo run -p splendor-pokemon-cli -- arena \
-  --candidate heuristic --baseline heuristic-v1 \
+  --candidate minimax --baseline heuristic-v1 \
   --require 50
 ```
 
 官方模式会自动读取 `backend/arena-seeds.txt` 中的增量游标，跑完后把游标推进 10；游标文件随仓库提交，禁止重置或回退。调试可用 `--seeds N --seed-start M`，但不会消耗游标，也不能作为改动依据。
 
-输出包含胜-负-平、得分率、固定/增量种子分项、双方平均分、先/后手分项与僵局数。`--verbose` 可逐局打印；`heuristic-v1` 是冻结的回测基线。
+输出包含胜-负-平、得分率、固定/增量种子分项、双方平均分、先/后手分项与僵局数。`--verbose` 可逐局打印；`heuristic-v1` 是冻结的回测基线。`--candidate minimax` 可回测搜索策略。
 
 
 ## 4. 可视化结果
