@@ -109,8 +109,8 @@ CLI 启动后输入 `help` 查看命令。主要命令：
 - **回放结构**：`Replay { version, seed, players, controllers, frames, result, stalemate }`。`frames[0]` 是开局视图，之后每帧保存 `actor + Action + GameView + 本步事件文本`。为避免整局日志在每帧重复，帧内 `view.log` 只保留本步新增事件。
 - **规则僵局**：3 人局可能把普通球全部持有到供应区只剩大师球，此时若当前玩家无牌可捕捉，引擎没有合法主行动且规则未定义 pass。回放以 `stalemate: true`、无胜者收尾，不新增动作、不改变规则语义。
 - **输出位置**：`pve` / `bot-vs-bot` 默认写 `tmp/pve-<seed>-<n>p.*` 或 `tmp/bot-<seed>-<n>p.*`；`--replay` / `--html` 可覆盖。`tmp/` 已被 `.gitignore` 忽略。
-- **HTML 回放**：单个文件内嵌全部 CSS / JS / JSON，不引用 CDN、字体或图片，`file://` 直接打开。支持上一步 / 下一步 / 自动播放 / 速度 / 进度条 / 键盘方向键，展示场上牌、供应区、各玩家球与减免、分数、保留数、最近动作与终局横幅。选 HTML 而非 ratatui：无需额外终端依赖、卡片信息密度更高、可截图分享，且同一份回放 JSON 就是 `game/` Godot 前端的数据源。
-- **Godot 回放**：`game/` 是独立 Godot 4.6 工程，读取同一份回放 JSON，逐帧绘制场上牌、供应区、玩家与事件；只读界面，不改规则。启动、操作与无头冒烟命令见根 README 与 [`game/README.md`](../game/README.md)。
+- **HTML 回放**：单个文件内嵌全部 CSS / JS / JSON，不引用 CDN、字体或图片，`file://` 直接打开。支持上一步 / 下一步 / 自动播放 / 速度 / 进度条 / 键盘方向键，展示场上牌、供应区、各玩家球与减免、分数、保留数、最近动作与终局横幅。场上牌以减免色为底，中央是完整名字大字（按名字长度自适应字号），左下角是捕捉费用彩球与数字，右上角是分数。选 HTML 而非 ratatui：无需额外终端依赖、卡片信息密度更高、可截图分享，且同一份回放 JSON 就是 `game/` Godot 前端的数据源。
+- **Godot 回放**：`game/` 是独立 Godot 4.6 工程，读取同一份回放 JSON，逐帧绘制场上牌、供应区、玩家与事件；场上牌使用与 HTML 相同的卡面语言（减免色底、中央大字、左下费用球），只读界面，不改规则。启动、操作与无头冒烟命令见根 README 与 [`game/README.md`](../game/README.md)。
 
 ## 规则覆盖
 

@@ -80,25 +80,67 @@
   }
   .cards { display: flex; flex-wrap: wrap; gap: 8px; }
   .card {
-    width: 156px; min-height: 132px; border-radius: 10px; padding: 8px 9px;
-    background: var(--panel-2); border: 1px solid var(--line); border-top: 3px solid var(--accent);
-    display: flex; flex-direction: column; gap: 5px;
+    --card-rgb: 124, 156, 255;
+    width: 168px; min-height: 208px; border-radius: 12px; padding: 8px 10px 9px;
+    background:
+      radial-gradient(115% 80% at 50% -8%, rgba(var(--card-rgb), .50), rgba(var(--card-rgb), .12) 62%, transparent 100%),
+      linear-gradient(170deg, rgba(var(--card-rgb), .24), #141922 78%);
+    border: 1px solid rgba(var(--card-rgb), .55);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .08);
+    display: flex; flex-direction: column; gap: 4px;
   }
-  .card.empty { opacity: .35; align-items: center; justify-content: center; border-top-color: var(--line); }
-  .card.level_1 { border-top-color: #6f8f66; }
-  .card.level_2 { border-top-color: #4b8ee5; }
-  .card.level_3 { border-top-color: #b07bd8; }
-  .card.rare { border-top-color: #f0c15a; }
-  .card.legendary { border-top-color: #ff7a59; }
-  .card-head { display: flex; justify-content: space-between; gap: 6px; align-items: flex-start; }
-  .card-name { font-weight: 700; font-size: 14px; }
+  .card.bonus-red { --card-rgb: 229, 83, 75; }
+  .card.bonus-blue { --card-rgb: 75, 142, 229; }
+  .card.bonus-yellow { --card-rgb: 215, 181, 69; }
+  .card.bonus-pink { --card-rgb: 229, 107, 181; }
+  .card.bonus-black { --card-rgb: 139, 147, 167; }
+  .card.empty {
+    opacity: .35; align-items: center; justify-content: center;
+    background: var(--panel-2); border: 1px dashed var(--line); box-shadow: none;
+  }
+  .card-head { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+  .card-cat { font-size: 10px; font-weight: 700; letter-spacing: .16em; color: var(--muted); }
+  .card.level1 .card-cat { color: #9fbf93; }
+  .card.level2 .card-cat { color: #8ab4f8; }
+  .card.level3 .card-cat { color: #cfa6ef; }
+  .card.rare .card-cat { color: var(--gold); }
+  .card.legendary .card-cat { color: #ff9c85; }
+  .card-glyph {
+    flex: 1 1 auto; min-height: 82px; margin-top: 1px;
+    display: grid; place-items: center;
+    font-size: 46px; font-weight: 900; line-height: 1; color: #fff; white-space: nowrap;
+    letter-spacing: .01em;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, .3), 0 0 26px rgba(var(--card-rgb), .8);
+    background: radial-gradient(circle at 50% 46%, rgba(255, 255, 255, .16), transparent 66%);
+  }
+  .card-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+  .card-evo {
+    display: flex; align-items: center; justify-content: space-between; gap: 4px;
+    font-size: 10px; color: #d9c9ff;
+  }
+  .card-evo .evo-target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-evo .evo-req { display: inline-flex; align-items: center; gap: 3px; flex: none; font-weight: 700; }
+  .card-cost { display: flex; align-items: center; gap: 3px; align-self: flex-start; }
+  .ball {
+    width: 19px; height: 19px; border-radius: 50%; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; line-height: 1;
+    border: 1px solid rgba(255, 255, 255, .35);
+    box-shadow: inset 0 -2px 4px rgba(0, 0, 0, .3), 0 1px 2px rgba(0, 0, 0, .3);
+  }
+  .ball.red { background: var(--red); color: #fff; }
+  .ball.blue { background: var(--blue); color: #fff; }
+  .ball.yellow { background: var(--yellow); color: #2a2408; }
+  .ball.pink { background: var(--pink); color: #2c0f21; }
+  .ball.black { background: var(--black); color: #14161c; }
+  .ball.master { background: var(--master); color: #1a1230; }
+  .card-cost .free { font-size: 10px; color: var(--muted); padding-left: 2px; }
   .points {
     background: #2d4a9e; color: #fff; border-radius: 999px; padding: 0 8px;
     font-size: 12px; font-weight: 800; line-height: 20px; white-space: nowrap;
   }
   .points.zero { background: #2a3140; color: var(--muted); }
   .line { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
-  .evo { color: #c9a7ff; font-size: 11px; line-height: 1.35; }
   .pill {
     display: inline-flex; align-items: center; gap: 4px; border-radius: 999px;
     padding: 1px 7px; background: #232b3a; color: var(--text); font-size: 11px;
@@ -218,9 +260,9 @@
     game_over: "终局",
   };
   const CATEGORIES = [
-    { key: "level_1", board: "level1", label: "1 阶" },
-    { key: "level_2", board: "level2", label: "2 阶" },
-    { key: "level_3", board: "level3", label: "3 阶" },
+    { key: "level1", board: "level1", label: "1 阶" },
+    { key: "level2", board: "level2", label: "2 阶" },
+    { key: "level3", board: "level3", label: "3 阶" },
     { key: "rare", board: "rare", label: "稀有" },
     { key: "legendary", board: "legendary", label: "传说" },
   ];
@@ -248,6 +290,16 @@
     return found ? found.label : key;
   }
 
+  function categoryLabel(key) {
+    const found = CATEGORIES.find((category) => category.key === key);
+    return found ? found.label : key;
+  }
+
+  function glyphFontSize(name) {
+    const length = Math.max([...name].length, 1);
+    return Math.min(56, Math.floor(140 / length));
+  }
+
   function playerName(view, id) {
     const player = view.players.find((item) => item.id === id);
     return player ? player.name : `玩家 ${id}`;
@@ -267,45 +319,50 @@
     return wrap;
   }
 
+  function costNode(cost) {
+    const wrap = node("div", "card-cost");
+    wrap.title = "捕捉费用";
+    let hasCost = false;
+    if (cost) {
+      for (const color of COLORS) {
+        const count = cost[color.key] || 0;
+        if (count === 0) continue;
+        hasCost = true;
+        const ball = node("span", `ball ${color.key}`, String(count));
+        ball.title = `${color.label} ${count}`;
+        wrap.append(ball);
+      }
+    }
+    if (!hasCost) wrap.append(node("span", "free", "免费"));
+    return wrap;
+  }
+
   function cardNode(card) {
-    const element = node("div", `card ${card.category}`);
+    const element = node("div", `card ${card.category} bonus-${card.bonus_color}`);
     const head = node("div", "card-head");
-    head.append(node("div", "card-name", card.name_zh));
+    head.append(node("span", "card-cat", categoryLabel(card.category)));
     const points = node("span", card.points > 0 ? "points" : "points zero", `${card.points}`);
     head.append(points);
     element.append(head);
 
-    const bonus = node("div", "line");
-    bonus.append(node("span", `dot c-${card.bonus_color}`));
-    bonus.append(document.createTextNode(`减免 ${colorLabel(card.bonus_color)} +${card.bonus_count}`));
-    element.append(bonus);
+    const glyph = node("div", "card-glyph", card.name_zh);
+    glyph.style.fontSize = `${glyphFontSize(card.name_zh)}px`;
+    element.append(glyph);
 
-    if (card.cost && Object.values(card.cost).some((value) => value > 0)) {
-      const cost = node("div", "line");
-      for (const color of COLORS) {
-        const count = card.cost[color.key] || 0;
-        if (count === 0) continue;
-        const pill = node("span", "pill");
-        pill.append(node("span", `dot c-${color.key}`));
-        pill.append(document.createTextNode(`${count}`));
-        cost.append(pill);
-      }
-      element.append(cost);
-    } else {
-      element.append(node("div", "line", "免费"));
-    }
-
+    const bottom = node("div", "card-bottom");
     if (card.evolves_to_zh && card.evolution_requirement) {
-      element.append(
-        node(
-          "div",
-          "evo",
-          `→ ${card.evolves_to_zh} · 需 ${card.evolution_requirement.count}${colorLabel(
-            card.evolution_requirement.color
-          )}减免`
-        )
-      );
+      const requirement = card.evolution_requirement;
+      const evo = node("div", "card-evo");
+      evo.append(node("span", "evo-target", `→ ${card.evolves_to_zh}`));
+      const req = node("span", "evo-req");
+      req.append(document.createTextNode(String(requirement.count)));
+      req.append(node("span", `dot c-${requirement.color}`));
+      evo.append(req);
+      evo.title = `进化：需 ${requirement.count}${colorLabel(requirement.color)}减免`;
+      bottom.append(evo);
     }
+    bottom.append(costNode(card.cost));
+    element.append(bottom);
     return element;
   }
 

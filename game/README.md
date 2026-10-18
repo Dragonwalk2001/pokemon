@@ -9,7 +9,7 @@ game/
 ├── project.godot              # 1440×900，canvas_items 拉伸，gl_compatibility
 ├── scenes/main.tscn           # 顶栏 / 时间轴 / 横幅 / 场上牌 / 玩家 / 供应区 / 事件
 ├── scripts/main.gd            # 回放载入、逐帧渲染、播放控制、冒烟
-├── scripts/game/board_view.gd # 场上 5 行牌的自绘视图 + 悬停 tooltip
+├── scripts/game/board_view.gd # 场上 5 行牌（减免色卡面 / 中央完整名字 / 费用球）+ 悬停 tooltip
 ├── scripts/ui/styles.gd       # 色板与 StyleBoxFlat 工厂（与 HTML 回放同色）
 ├── theme/game_theme.tres      # SystemFont：中文走系统字体兜底
 └── icon.svg
@@ -40,6 +40,7 @@ game/
 - `frames[0]` 是开局视图，之后每帧保存 `actor + Action + GameView + 本步事件文本`。
 - 视图按执行动作的玩家生成：自己的 `reserved` 是数组，对手为 `null` 且只有 `reserved_count`。界面不额外泄露牌面。
 - 场上牌、费用、减免、进化需求全部来自卡牌对象；Godot 不重新计算规则。
+- 卡面中央大字直接取 `name_zh`，按名字长度自适应字号；卡面不重复显示小名字，完整信息仍在 tooltip 中。
 
 ## 操作
 
@@ -55,7 +56,7 @@ game/
 | 悬停场上牌 | 显示名字、分数、减免、费用、进化需求的 tooltip |
 | 悬停玩家面板 | 显示该玩家的完整捕捉 / 保留列表 |
 
-界面尺寸：窗口 1440×900，最小 1100×700；`canvas_items` + `aspect=expand`，窗口缩放时整体等比缩放并扩展布局。场上牌行高不足 72px 时自动切紧凑模式（隐藏进化行）。玩家面板内只显示最高分 3 张捕捉牌与 2 张保留牌的摘要，完整列表在 tooltip 中，避免长局把棋盘挤扁。
+界面尺寸：窗口 1440×900，最小 1100×700；`canvas_items` + `aspect=expand`，窗口缩放时整体等比缩放并扩展布局。卡面底色取减免颜色，中央是完整名字大字（2–4 字，按名字长度自适应字号），右上角分数，左下角捕捉费用（彩球 + 数字），右下角进化需求；完整费用与减免数值见 tooltip。场上牌行高不足 72px 时自动切紧凑模式（隐藏进化行）。玩家面板内只显示最高分 3 张捕捉牌与 2 张保留牌的摘要，完整列表在 tooltip 中，避免长局把棋盘挤扁。
 
 ## 冒烟
 

@@ -2,8 +2,8 @@ extends Control
 ## 场上牌自绘视图：五行（1/2/3 阶、稀有、传说）。
 ##
 ## 只负责渲染与悬停高亮，回放状态由 main.gd 通过 `set_view()` 注入。
-## 每张牌画出名字、分数、减免、费用与进化需求；行高不足时自动隐藏进化行。
-## 鼠标悬停会高亮牌面，并用 tooltip 展示完整卡牌信息。
+## 卡面以减免色为底，中央是完整名字大字，右上角分数，左下角捕捉费用；
+## 行高足够时在右下角显示进化需求。鼠标悬停会高亮牌面并展示完整 tooltip。
 
 const Styles := preload("res://scripts/ui/styles.gd")
 
@@ -107,36 +107,40 @@ func _draw_row_label(font: Font, row: Dictionary, rect: Rect2) -> void:
 	)
 
 
-func _draw_card(font: Font, box: Rect2, card: Dictionary, accent: Color, compact: bool) -> void:
-	draw_style_box(Styles.panel_box(Styles.COLOR_PANEL_2, Styles.COLOR_LINE, 10), box)
+func _draw_card(font: Font, box: Rect2, card: Dictionary, _accent: Color, compact: bool) -> void:
+	var bonus_key := str(card.get("bonus_color", "red"))
+	var bonus_color: Color = Styles.TOKEN_COLORS.get(bonus_key, Styles.COLOR_ACCENT)
+	draw_style_box(
+		Styles.panel_box(
+			Styles.COLOR_PANEL_2.lerp(bonus_color, 0.22),
+			Styles.COLOR_LINE.lerp(bonus_color, 0.60),
+			10
+		),
+		box
+	)
 
-	var pad := 10.0
+	var pad := 7.0 if compact else 10.0
 	var inner_x := box.position.x + pad
 	var inner_w := box.size.x - pad * 2.0
 	var height := box.size.y
-	var name_size := 11 if compact else (12 if height < 100.0 else 14)
-	var small_size := 9 if compact else (10 if height < 100.0 else 11)
-	var name_baseline := box.position.y + height * 0.26
-	var bonus_baseline := box.position.y + height * 0.48
-	var cost_baseline := box.position.y + height * 0.68
-
-	# 顶部类别色条（HTML 回放的 border-top 对应物）。
-	draw_line(
-		Vector2(box.position.x + 9.0, box.position.y + 2.0),
-		Vector2(box.position.x + box.size.x - 9.0, box.position.y + 2.0),
-		accent,
-		3.0
+	var small_size := 8 if compact else 9
+	var name := str(card.get("name_zh", "?"))
+	var glyph_limit := minf(
+		32.0 if compact else 50.0, height * (0.38 if compact else 0.42)
 	)
+	var glyph_size := int(maxf(
+		20.0, minf(glyph_limit, (inner_w - 8.0) / maxf(float(name.length()), 1.0))
+	))
 
-	# 分数徽章。
+	# 分数徽章（右上角）。
 	var points := int(card.get("points", 0))
-	var badge_radius := 8.0 if compact else (9.0 if height < 100.0 else 11.0)
+	var badge_radius := 6.5 if compact else 9.0
 	var badge_center := Vector2(
 		box.position.x + box.size.x - pad - badge_radius,
-		box.position.y + 7.0 + badge_radius
+		box.position.y + pad + badge_radius
 	)
 	draw_circle(badge_center, badge_radius, Styles.COLOR_GOLD if points > 0 else Color("2a3140"))
-	var badge_font_size := 11 if compact else 12
+	var badge_font_size := 10 if compact else 11
 	var badge_text := str(points)
 	var badge_text_w := font.get_string_size(
 		badge_text, HORIZONTAL_ALIGNMENT_LEFT, -1, badge_font_size
@@ -151,64 +155,65 @@ func _draw_card(font: Font, box: Rect2, card: Dictionary, accent: Color, compact
 		Color("1a1a22") if points > 0 else Styles.COLOR_MUTED
 	)
 
-	# 名字。
-	var name := str(card.get("name_zh", "?"))
+	# 中央大字：完整名字，按名字长度自适应字号。
+	var glyph := name
+	var glyph_w := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, glyph_size).x
+	var glyph_pos := Vector2(
+		box.position.x + (box.size.x - glyph_w) * 0.5,
+		box.position.y + height * (0.46 if compact else 0.48) + glyph_size * 0.36
+	)
 	draw_string(
 		font,
-		Vector2(inner_x, name_baseline),
-		name,
+		glyph_pos + Vector2(1.5, 2.0),
+		glyph,
 		HORIZONTAL_ALIGNMENT_LEFT,
-		inner_w - badge_radius * 2.0 - 8.0,
-		name_size,
-		Styles.COLOR_TEXT
+		-1,
+		glyph_size,
+		Color(0, 0, 0, 0.35)
 	)
-
-	# 减免。
-	var bonus_key := str(card.get("bonus_color", "red"))
-	var bonus_count := int(card.get("bonus_count", 0))
-	var bonus_color: Color = Styles.TOKEN_COLORS.get(bonus_key, Styles.COLOR_ACCENT)
-	draw_circle(Vector2(inner_x + 4.0, bonus_baseline - 4.0), 4.0, bonus_color)
 	draw_string(
 		font,
-		Vector2(inner_x + 13.0, bonus_baseline),
-		"减免 %s +%d" % [Styles.COLOR_LABELS.get(bonus_key, "?"), bonus_count],
+		glyph_pos,
+		glyph,
 		HORIZONTAL_ALIGNMENT_LEFT,
-		inner_w - 13.0,
-		small_size,
-		Styles.COLOR_MUTED
+		-1,
+		glyph_size,
+		Color("f4f7ff")
 	)
 
-	# 费用：彩色圆点 + 数量；零费用写「免费」。
+	# 捕捉费用：左下角彩色球 + 数字；零费用写「免费」。
 	var cost: Dictionary = {}
 	var cost_raw: Variant = card.get("cost", {})
 	if cost_raw is Dictionary:
 		cost = cost_raw
-	var cursor := inner_x
+	var ball_radius := 6.0 if compact else 7.5
+	var cost_center_y := box.position.y + height - pad - ball_radius
+	var number_size := 8 if compact else 9
+	var cursor := inner_x + ball_radius
 	var has_cost := false
 	for key in Styles.COLOR_KEYS:
 		var count := int(cost.get(key, 0))
 		if count <= 0:
 			continue
 		has_cost = true
+		var ball_color: Color = Styles.TOKEN_COLORS.get(key, Styles.COLOR_ACCENT)
+		draw_circle(Vector2(cursor, cost_center_y), ball_radius, ball_color)
 		var label := str(count)
-		var label_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, small_size).x
-		if cursor + 10.0 + label_w > inner_x + inner_w:
-			break
-		draw_circle(Vector2(cursor + 3.5, cost_baseline - 4.0), 3.5, Styles.TOKEN_COLORS[key])
+		var label_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size).x
 		draw_string(
 			font,
-			Vector2(cursor + 10.0, cost_baseline),
+			Vector2(cursor - label_w * 0.5, cost_center_y + number_size * 0.36),
 			label,
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
-			small_size,
-			Styles.COLOR_TEXT
+			number_size,
+			_ball_ink(key)
 		)
-		cursor += 10.0 + label_w + 7.0
+		cursor += ball_radius * 2.0 + 3.0
 	if not has_cost:
 		draw_string(
 			font,
-			Vector2(inner_x, cost_baseline),
+			Vector2(inner_x, cost_center_y + small_size * 0.36),
 			"免费",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -216,7 +221,7 @@ func _draw_card(font: Font, box: Rect2, card: Dictionary, accent: Color, compact
 			Styles.COLOR_MUTED
 		)
 
-	# 进化需求（紧凑模式隐藏）。
+	# 进化需求（紧凑模式隐藏；放不下时省略）。
 	if compact:
 		return
 	var evolves_to := str(card.get("evolves_to_zh", ""))
@@ -224,21 +229,39 @@ func _draw_card(font: Font, box: Rect2, card: Dictionary, accent: Color, compact
 	if evolves_to.is_empty() or not (requirement_raw is Dictionary):
 		return
 	var requirement: Dictionary = requirement_raw
-	var requirement_key := str(requirement.get("color", "red"))
-	var requirement_count := int(requirement.get("count", 0))
+	var evo_text := "→ %s · %d%s" % [
+		evolves_to,
+		int(requirement.get("count", 0)),
+		Styles.COLOR_LABELS.get(str(requirement.get("color", "red")), "?"),
+	]
+	var evo_w := font.get_string_size(evo_text, HORIZONTAL_ALIGNMENT_LEFT, -1, small_size).x
+	var evo_x := box.position.x + box.size.x - pad - evo_w
+	if evo_x < cursor + 6.0:
+		return
 	draw_string(
 		font,
-		Vector2(inner_x, box.position.y + height * 0.87),
-		"→ %s · 需 %d%s减免" % [
-			evolves_to,
-			requirement_count,
-			Styles.COLOR_LABELS.get(requirement_key, "?"),
-		],
+		Vector2(evo_x, cost_center_y + small_size * 0.36),
+		evo_text,
 		HORIZONTAL_ALIGNMENT_LEFT,
-		inner_w,
+		-1,
 		small_size,
-		Color("c9a7ff")
+		Color("d9c9ff")
 	)
+
+
+## 费用球内数字：浅色球用深字，深色球用白字（与 HTML 卡面一致）。
+func _ball_ink(key: String) -> Color:
+	match key:
+		"yellow":
+			return Color("2a2408")
+		"pink":
+			return Color("2c0f21")
+		"black":
+			return Color("14161c")
+		"master":
+			return Color("1a1230")
+		_:
+			return Color.WHITE
 
 
 
