@@ -94,7 +94,8 @@ pub(crate) fn write_replay(
     write_file(html_path, html.as_bytes())?;
 
     println!("回放 JSON: {}", json_path.display());
-    println!("回放 HTML: {}（file:// 直接打开）", html_path.display());
+    println!("回放 HTML: {}", html_path.display());
+    println!("提示：回放 HTML可在浏览器 file:// 直接打开", html_path.display());
     Ok(())
 }
 

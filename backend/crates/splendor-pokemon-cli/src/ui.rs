@@ -17,7 +17,7 @@ pub(crate) fn print_usage() {
                               [--replay out.json] [--html out.html]
       全部由 bot 对局，默认记录到 tmp/bot-<seed>-<n>p.json / .html
   splendor-pokemon replay <replay.json> [--html out.html]
-      把回放 JSON 渲染为自包含 HTML（file:// 直接打开）"
+      把回放 JSON 渲染为自包含 HTML"
     );
 }
 
