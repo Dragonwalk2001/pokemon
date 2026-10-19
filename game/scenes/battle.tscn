@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/battle.gd" id="1_battle"]
 [ext_resource type="Script" path="res://scripts/game/board_view.gd" id="2_board"]
+[ext_resource type="Script" path="res://scripts/game/token_strip.gd" id="3_tokens"]
 
 [node name="Battle" type="Control"]
 layout_mode = 3
@@ -29,263 +30,365 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 18
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 18
-theme_override_constants/margin_bottom = 14
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
 
 [node name="Root" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="TopBar" type="HBoxContainer" parent="Margin/Root"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 12
 
 [node name="Title" type="Label" parent="Margin/Root/TopBar"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.909804, 0.929412, 0.968627, 1)
-theme_override_font_sizes/font_size = 24
-text = "璀璨宝石 · 宝可梦 — 和 AI 对战"
+theme_override_font_sizes/font_size = 20
+text = "璀璨宝石 · 宝可梦"
+
+[node name="PhaseBadge" type="Label" parent="Margin/Root/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.486275, 0.611765, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "连接中"
+vertical_alignment = 1
 
 [node name="Meta" type="Label" parent="Margin/Root/TopBar"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 12
 text = "正在连接本地引擎…"
 vertical_alignment = 1
 text_overrun_behavior = 3
 
-[node name="BotsLabel" type="Label" parent="Margin/Root/TopBar"]
+[node name="PauseButton" type="Button" parent="Margin/Root/TopBar"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "AI 数量"
-vertical_alignment = 1
-
-[node name="BotsOption" type="OptionButton" parent="Margin/Root/TopBar"]
-layout_mode = 2
-
-[node name="BotLabel" type="Label" parent="Margin/Root/TopBar"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "AI 策略"
-vertical_alignment = 1
-
-[node name="BotOption" type="OptionButton" parent="Margin/Root/TopBar"]
-layout_mode = 2
-
-[node name="SeedLabel" type="Label" parent="Margin/Root/TopBar"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "种子"
-vertical_alignment = 1
-
-[node name="SeedSpin" type="SpinBox" parent="Margin/Root/TopBar"]
-custom_minimum_size = Vector2(108, 0)
-layout_mode = 2
-min_value = 1.0
-max_value = 999999.0
-value = 42.0
-
-[node name="NewButton" type="Button" parent="Margin/Root/TopBar"]
-layout_mode = 2
-text = "新对局"
-
-[node name="ReplayButton" type="Button" parent="Margin/Root/TopBar"]
-layout_mode = 2
-text = "回放"
+text = "菜单 (Esc)"
 
 [node name="Body" type="HBoxContainer" parent="Margin/Root"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="Left" type="VBoxContainer" parent="Margin/Root/Body"]
+[node name="BoardColumn" type="VBoxContainer" parent="Margin/Root/Body"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
-[node name="BoardPanel" type="PanelContainer" parent="Margin/Root/Body/Left"]
+[node name="BoardPanel" type="PanelContainer" parent="Margin/Root/Body/BoardColumn"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Left/BoardPanel"]
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/BoardColumn/BoardPanel"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Left/BoardPanel/VBox"]
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/BoardColumn/BoardPanel/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
 theme_override_font_sizes/font_size = 12
-text = "场上牌（左键选择，右键保留）"
+text = "场上牌 · 先选牌，再用卡片下方按钮操作"
 
-[node name="BoardView" type="Control" parent="Margin/Root/Body/Left/BoardPanel/VBox"]
+[node name="BoardView" type="Control" parent="Margin/Root/Body/BoardColumn/BoardPanel/VBox"]
 custom_minimum_size = Vector2(0, 360)
 layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("2_board")
 
-[node name="PlayersPanel" type="PanelContainer" parent="Margin/Root/Body/Left"]
+[node name="LogPanel" type="PanelContainer" parent="Margin/Root/Body/BoardColumn"]
+custom_minimum_size = Vector2(0, 128)
 layout_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Left/PlayersPanel"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Left/PlayersPanel/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "玩家"
-
-[node name="PlayersRow" type="HBoxContainer" parent="Margin/Root/Body/Left/PlayersPanel/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="ReservedPanel" type="PanelContainer" parent="Margin/Root/Body/Left"]
-layout_mode = 2
-
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Left/ReservedPanel"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Left/ReservedPanel/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "我的保留牌（点击捕捉）"
-
-[node name="ReservedRow" type="HFlowContainer" parent="Margin/Root/Body/Left/ReservedPanel/VBox"]
-layout_mode = 2
-theme_override_constants/h_separation = 6
-theme_override_constants/v_separation = 4
-
-[node name="Right" type="VBoxContainer" parent="Margin/Root/Body"]
-custom_minimum_size = Vector2(380, 0)
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="SupplyPanel" type="PanelContainer" parent="Margin/Root/Body/Right"]
-layout_mode = 2
-
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Right/SupplyPanel"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Right/SupplyPanel/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "供应区（点击颜色选球，再点一次加一，循环清零）"
-
-[node name="SupplyList" type="VBoxContainer" parent="Margin/Root/Body/Right/SupplyPanel/VBox"]
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/BoardColumn/LogPanel"]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="SelectionLabel" type="Label" parent="Margin/Root/Body/Right/SupplyPanel/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "尚未选择精灵球"
-autowrap_mode = 2
-
-[node name="SupplyActions" type="HBoxContainer" parent="Margin/Root/Body/Right/SupplyPanel/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="ClearButton" type="Button" parent="Margin/Root/Body/Right/SupplyPanel/VBox/SupplyActions"]
-layout_mode = 2
-text = "清空"
-
-[node name="TakeButton" type="Button" parent="Margin/Root/Body/Right/SupplyPanel/VBox/SupplyActions"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "拿取所选"
-
-
-[node name="ActionPanel" type="PanelContainer" parent="Margin/Root/Body/Right"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Right/ActionPanel"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "你的行动"
-
-[node name="PhaseLabel" type="Label" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.486275, 0.611765, 1, 1)
-theme_override_font_sizes/font_size = 16
-text = "等待开局"
-
-[node name="HintLabel" type="Label" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = ""
-autowrap_mode = 2
-
-[node name="ActionList" type="VBoxContainer" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="EventsTitle" type="Label" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/BoardColumn/LogPanel/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
 theme_override_font_sizes/font_size = 12
 text = "对局记录"
 
-[node name="Events" type="RichTextLabel" parent="Margin/Root/Body/Right/ActionPanel/VBox"]
-custom_minimum_size = Vector2(0, 150)
+[node name="Events" type="RichTextLabel" parent="Margin/Root/Body/BoardColumn/LogPanel/VBox"]
+custom_minimum_size = Vector2(0, 84)
 layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = false
 scroll_following = true
 selection_enabled = true
 
-[node name="BannerPanel" type="PanelContainer" parent="Margin/Root"]
-visible = false
+[node name="Side" type="VBoxContainer" parent="Margin/Root/Body"]
+custom_minimum_size = Vector2(322, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OpponentsPanel" type="PanelContainer" parent="Margin/Root/Body/Side"]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/OpponentsPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/OpponentsPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "对手"
+
+[node name="OpponentsBox" type="VBoxContainer" parent="Margin/Root/Body/Side/OpponentsPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="SupplyPanel" type="PanelContainer" parent="Margin/Root/Body/Side"]
 layout_mode = 2
 
-[node name="BannerRow" type="HBoxContainer" parent="Margin/Root/BannerPanel"]
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/SupplyPanel"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 5
 
-[node name="BannerLabel" type="Label" parent="Margin/Root/BannerPanel/BannerRow"]
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/SupplyPanel/VBox"]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 15
-vertical_alignment = 1
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "精灵球 · 左键 +1 / 右键 −1"
+
+[node name="SupplyView" type="Control" parent="Margin/Root/Body/Side/SupplyPanel/VBox"]
+custom_minimum_size = Vector2(0, 62)
+layout_mode = 2
+script = ExtResource("3_tokens")
+
+[node name="SupplyHint" type="Label" parent="Margin/Root/Body/Side/SupplyPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45098, 0.501961, 0.588235, 1)
+theme_override_font_sizes/font_size = 11
+text = "最多拿 3 个：三种颜色各 1，或同色 2 个（该色需至少 4 个）。"
 autowrap_mode = 2
 
-[node name="SaveButton" type="Button" parent="Margin/Root/BannerPanel/BannerRow"]
+[node name="ReservedPanel" type="PanelContainer" parent="Margin/Root/Body/Side"]
 layout_mode = 2
-text = "保存回放"
 
-[node name="AgainButton" type="Button" parent="Margin/Root/BannerPanel/BannerRow"]
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/ReservedPanel"]
 layout_mode = 2
-text = "再来一局"
+theme_override_constants/separation = 5
+
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/ReservedPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "我的保留牌 · 点击捕捉"
+
+[node name="ReservedRow" type="HFlowContainer" parent="Margin/Root/Body/Side/ReservedPanel/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 4
+
+[node name="MePanel" type="PanelContainer" parent="Margin/Root/Body/Side"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/MePanel"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="MeHead" type="HBoxContainer" parent="Margin/Root/Body/Side/MePanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MeTokens" type="Label" parent="Margin/Root/Body/Side/MePanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "精灵球：—"
+autowrap_mode = 2
+
+[node name="MeCards" type="HFlowContainer" parent="Margin/Root/Body/Side/MePanel/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 4
+
+[node name="ActionDock" type="PanelContainer" parent="Margin/Root"]
+custom_minimum_size = Vector2(0, 92)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/ActionDock"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PromptRow" type="HBoxContainer" parent="Margin/Root/ActionDock/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PromptLabel" type="Label" parent="Margin/Root/ActionDock/VBox/PromptRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.909804, 0.929412, 0.968627, 1)
+theme_override_font_sizes/font_size = 14
+text = "正在连接本地引擎…"
+autowrap_mode = 2
+
+[node name="BasketLabel" type="Label" parent="Margin/Root/ActionDock/VBox/PromptRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.941176, 0.756863, 0.352941, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+vertical_alignment = 1
+
+[node name="ButtonRow" type="HBoxContainer" parent="Margin/Root/ActionDock/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EndTurnButton" type="Button" parent="Margin/Root/ActionDock/VBox/ButtonRow"]
+custom_minimum_size = Vector2(132, 36)
+layout_mode = 2
+text = "结束回合"
+
+[node name="AuxButton" type="Button" parent="Margin/Root/ActionDock/VBox/ButtonRow"]
+custom_minimum_size = Vector2(132, 36)
+layout_mode = 2
+text = "进化…"
+
+[node name="Spacer" type="Control" parent="Margin/Root/ActionDock/VBox/ButtonRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CancelButton" type="Button" parent="Margin/Root/ActionDock/VBox/ButtonRow"]
+custom_minimum_size = Vector2(112, 36)
+layout_mode = 2
+text = "取消"
+
+[node name="ConfirmButton" type="Button" parent="Margin/Root/ActionDock/VBox/ButtonRow"]
+custom_minimum_size = Vector2(180, 36)
+layout_mode = 2
+text = "确认"
+
+[node name="ContextActions" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 320.0
+offset_bottom = 48.0
+
+[node name="Row" type="HBoxContainer" parent="ContextActions"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CaptureButton" type="Button" parent="ContextActions/Row"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+text = "捕捉"
+
+[node name="ReserveButton" type="Button" parent="ContextActions/Row"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+text = "保留"
+
+[node name="CloseButton" type="Button" parent="ContextActions/Row"]
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+text = "×"
+
+[node name="Overlay" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Dim" type="ColorRect" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0196078, 0.027451, 0.0431373, 0.72)
+
+[node name="Center" type="CenterContainer" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Modal" type="PanelContainer" parent="Overlay/Center"]
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Overlay/Center/Modal"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Overlay/Center/Modal/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "菜单"
+
+[node name="Body" type="VBoxContainer" parent="Overlay/Center/Modal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Options" type="VBoxContainer" parent="Overlay/Center/Modal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Footer" type="HBoxContainer" parent="Overlay/Center/Modal/VBox"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 8
+
+[node name="CancelButton" type="Button" parent="Overlay/Center/Modal/VBox/Footer"]
+custom_minimum_size = Vector2(112, 36)
+layout_mode = 2
+text = "取消"
+
+[node name="ConfirmButton" type="Button" parent="Overlay/Center/Modal/VBox/Footer"]
+custom_minimum_size = Vector2(168, 36)
+layout_mode = 2
+text = "确定"
+
+[node name="ToastPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -280.0
+offset_top = -78.0
+offset_right = 280.0
+offset_bottom = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="Label" type="Label" parent="ToastPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = ""
+horizontal_alignment = 1
 
 [node name="ApiRequest" type="HTTPRequest" parent="."]
 timeout = 60.0
 
 [node name="StepTimer" type="Timer" parent="."]
-wait_time = 0.35
+wait_time = 0.45
 one_shot = true
 
 [node name="ConnectTimer" type="Timer" parent="."]
 wait_time = 0.5
 
 [node name="ToastTimer" type="Timer" parent="."]
-wait_time = 5.0
+wait_time = 4.0
 one_shot = true
-

@@ -1,14 +1,15 @@
 extends Control
 ## 场上牌自绘视图：五行（1/2/3 阶、稀有、传说）。
 ##
-## 只负责渲染、悬停高亮与点击命中，回放状态由 main.gd 通过 `set_view()` 注入。
-## 卡面以减免色为底，中央是完整名字大字，右上角分数，左下角捕捉费用；
-## 行高足够时在右下角显示进化需求。鼠标悬停会高亮牌面并展示完整 tooltip。
-## `set_interactive(true)` 后左键发 `slot_clicked`、右键发 `slot_right_clicked`；
-## 回放界面不开启交互，行为与之前一致。
+## 渲染、悬停高亮、点击命中与键盘浏览。回放注入只读视图；对战额外注入
+## 由 legal_actions 派生出的可操作集合：
+## - 左键和右键都是「选中」，不会直接提交动作；动作按钮由 battle.gd 贴卡片显示；
+## - 既不能捕捉也不能保留的牌会降亮度；
+## - 选中牌抬起并显示金色描边。
+##
+## 键盘：Tab 聚焦后，方向键移动焦点，Enter / 空格选中。
 
 signal slot_clicked(row: int, slot: int, card: Dictionary)
-signal slot_right_clicked(row: int, slot: int, card: Dictionary)
 
 const Styles := preload("res://scripts/ui/styles.gd")
 
@@ -26,37 +27,54 @@ const CARD_GAP := 8.0
 const MAX_SLOTS := 4.0
 const MIN_CARD_W := 80.0
 const COMPACT_H := 72.0
+const LIFT := 4.0
 
 var _board: Dictionary = {}
 var _hover := Vector2i(-1, -1)
 var _selected := Vector2i(-1, -1)
+var _focused := Vector2i(-1, -1)
 var _interactive := false
-var _boxes: Dictionary = {}  # Vector2i(row, slot) -> Rect2
+var _actionable: Dictionary = {}
+var _boxes: Dictionary = {}
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	clip_contents = true
+	focus_mode = Control.FOCUS_ALL
 	resized.connect(queue_redraw)
 	mouse_exited.connect(_on_mouse_exited)
+	focus_entered.connect(_on_focus_entered)
+	focus_exited.connect(_on_focus_exited)
 
 
-## 注入一帧的 `view.board`。空字典表示尚未载入回放。
+## 注入一帧的 `view.board`。空字典表示尚未载入数据。
 func set_view(board: Dictionary) -> void:
 	_board = board
 	_hover = Vector2i(-1, -1)
 	_selected = Vector2i(-1, -1)
+	_focused = Vector2i(-1, -1)
 	_boxes.clear()
 	tooltip_text = ""
 	queue_redraw()
 
 
-## 交互模式：开启后左键选择、右键快捷操作；回放界面保持关闭。
+## 可操作集合：键是 "row:slot"，值形如 {"capture": true, "reserve": true}。
+func set_actionable(actionable: Dictionary) -> void:
+	_actionable = actionable.duplicate(true)
+	queue_redraw()
+
+
+## 交互模式：开启后点击会选中并发出 slot_clicked；回放界面保持关闭。
 func set_interactive(enabled: bool) -> void:
 	_interactive = enabled
 	mouse_default_cursor_shape = (
 		Control.CURSOR_POINTING_HAND if enabled else Control.CURSOR_ARROW
 	)
+	if not enabled:
+		_hover = Vector2i(-1, -1)
+		_selected = Vector2i(-1, -1)
+		tooltip_text = ""
 	queue_redraw()
 
 
@@ -68,6 +86,13 @@ func set_selected(key: Vector2i) -> void:
 
 func selected() -> Vector2i:
 	return _selected
+
+
+## 选中卡片在本控件内的矩形；battle.gd 用它定位贴卡动作条。
+func selection_rect() -> Rect2:
+	if not _boxes.has(_selected):
+		return Rect2()
+	return _boxes[_selected]
 
 
 ## 当前注入的 board（冒烟测试用）。
@@ -110,16 +135,38 @@ func _draw() -> void:
 			)
 			_boxes[Vector2i(row_index, slot_index)] = box
 			var card: Variant = slots[slot_index] if slot_index < slots.size() else null
+			var key := Vector2i(row_index, slot_index)
+			var legal := _actionable.has(_key_text(key))
+			var display := box
+			if key == _selected or key == _hover:
+				var lift := minf(LIFT, box.position.y)
+				display.position.y -= lift
+				display.size.y += lift
 			if card is Dictionary:
-				_draw_card(font, box, card, row["accent"], compact)
+				_draw_card(font, display, card, row["accent"], compact)
+				if _interactive and not _actionable.is_empty() and not legal:
+					draw_rect(display, Color(0.04, 0.05, 0.08, 0.58))
+				if legal:
+					_draw_legal_dots(display, key)
 			else:
-				_draw_empty_slot(font, box, compact)
-			if _hover == Vector2i(row_index, slot_index):
-				draw_style_box(Styles.border_box(Styles.COLOR_ACCENT, 2, 10), box)
-			if _selected == Vector2i(row_index, slot_index):
-				draw_style_box(Styles.border_box(Styles.COLOR_GOLD, 3, 10), box)
+				_draw_empty_slot(font, display, compact)
+			if _hover == key:
+				draw_style_box(Styles.border_box(Styles.COLOR_ACCENT, 2, 10), display)
+			if has_focus() and _focused == key:
+				draw_style_box(Styles.border_box(Styles.COLOR_ACCENT, 2, 10), display)
+			if _selected == key:
+				draw_style_box(Styles.border_box(Styles.COLOR_GOLD, 3, 10), display)
 
 
+## 左上角小圆点：金色 = 可捕捉，蓝色 = 可保留，两个都有则并排。
+func _draw_legal_dots(box: Rect2, key: Vector2i) -> void:
+	var entry: Dictionary = _actionable.get(_key_text(key), {})
+	var center := Vector2(box.position.x + 9.0, box.position.y + 9.0)
+	if bool(entry.get("capture", false)):
+		draw_circle(center, 4.0, Styles.COLOR_GOLD)
+		center.x += 11.0
+	if bool(entry.get("reserve", false)):
+		draw_circle(center, 4.0, Styles.COLOR_ACCENT)
 func _draw_row_label(font: Font, row: Dictionary, rect: Rect2) -> void:
 	var label := str(row["label"])
 	var font_size := 12
@@ -291,9 +338,6 @@ func _ball_ink(key: String) -> Color:
 			return Color("1a1230")
 		_:
 			return Color.WHITE
-
-
-
 func _draw_empty_slot(font: Font, box: Rect2, compact: bool) -> void:
 	draw_style_box(Styles.panel_box(Color("141a24"), Color("242c3a"), 10), box)
 	var font_size := 11 if compact else 12
@@ -316,7 +360,7 @@ func _draw_empty_state() -> void:
 	draw_string(
 		font,
 		Vector2(0.0, center_y),
-		"尚未加载回放",
+		"尚未载入对局数据",
 		HORIZONTAL_ALIGNMENT_CENTER,
 		size.x,
 		20,
@@ -325,7 +369,7 @@ func _draw_empty_state() -> void:
 	draw_string(
 		font,
 		Vector2(0.0, center_y + 30.0),
-		"点击右上角「打开回放…」，选择 CLI 生成的 JSON",
+		"对战：先选一张牌，或点击右侧精灵球",
 		HORIZONTAL_ALIGNMENT_CENTER,
 		size.x,
 		13,
@@ -334,7 +378,7 @@ func _draw_empty_state() -> void:
 	draw_string(
 		font,
 		Vector2(0.0, center_y + 52.0),
-		"backend/ 下运行 bot-vs-bot 或 pve 会写入 tmp/*.json",
+		"回放：从标题菜单选择 CLI 导出的 JSON",
 		HORIZONTAL_ALIGNMENT_CENTER,
 		size.x,
 		12,
@@ -343,6 +387,9 @@ func _draw_empty_state() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		_handle_key(event)
+		return
 	if event is InputEventMouseMotion:
 		var found := _slot_at(event.position)
 		if found != _hover:
@@ -350,20 +397,99 @@ func _gui_input(event: InputEvent) -> void:
 			tooltip_text = _tooltip_for(found)
 			queue_redraw()
 		return
-	if not _interactive or not (event is InputEventMouseButton) or not event.pressed:
+	if not (event is InputEventMouseButton) or not event.pressed:
+		return
+	if not _interactive:
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT and event.button_index != MOUSE_BUTTON_RIGHT:
 		return
 	var key := _slot_at(event.position)
 	if key.x < 0:
+		_activate(Vector2i(-1, -1), {})
 		return
 	var card := _card_at(key)
 	if card.is_empty():
 		return
-	if event.button_index == MOUSE_BUTTON_LEFT:
-		_selected = key
-		queue_redraw()
-		slot_clicked.emit(key.x, key.y, card)
-	elif event.button_index == MOUSE_BUTTON_RIGHT:
-		slot_right_clicked.emit(key.x, key.y, card)
+	_activate(key, card)
+
+
+func _handle_key(event: InputEventKey) -> void:
+	if not event.pressed or event.echo:
+		return
+	if not _interactive:
+		return
+	var delta := Vector2i.ZERO
+	match event.keycode:
+		KEY_LEFT:
+			delta = Vector2i(0, -1)
+		KEY_RIGHT:
+			delta = Vector2i(0, 1)
+		KEY_UP:
+			delta = Vector2i(-1, 0)
+		KEY_DOWN:
+			delta = Vector2i(1, 0)
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			if _focused.x < 0:
+				_focused = _first_card()
+			if _focused.x < 0:
+				return
+			var card := _card_at(_focused)
+			if card.is_empty():
+				return
+			_activate(_focused, card)
+			accept_event()
+			return
+		_:
+			return
+
+	if _focused.x < 0:
+		_focused = _first_card()
+	else:
+		_focused = _nearest(_focused, delta)
+	if _focused.x < 0:
+		return
+	_hover = _focused
+	tooltip_text = _tooltip_for(_focused)
+	queue_redraw()
+	accept_event()
+
+
+## 点击与键盘共用：选中并把选择交给 battle.gd（空 card 表示清空）。
+func _activate(key: Vector2i, card: Dictionary) -> void:
+	_selected = key
+	_focused = key
+	_hover = key
+	queue_redraw()
+	slot_clicked.emit(key.x, key.y, card)
+
+
+func _nearest(from: Vector2i, delta: Vector2i) -> Vector2i:
+	var key := from
+	for _step in 4:
+		var next := key + delta
+		if next.x < 0 or next.x >= ROWS.size():
+			break
+		var slots := int(ROWS[next.x]["slots"])
+		next.y = clampi(next.y, 0, slots - 1)
+		if next == key:
+			break
+		key = next
+		if not _card_at(key).is_empty():
+			return key
+	return from
+
+
+func _first_card() -> Vector2i:
+	for row_index in ROWS.size():
+		var slots := int(ROWS[row_index]["slots"])
+		for slot_index in slots:
+			if not _card_at(Vector2i(row_index, slot_index)).is_empty():
+				return Vector2i(row_index, slot_index)
+	return Vector2i(-1, -1)
+
+
+func _key_text(key: Vector2i) -> String:
+	return "%d:%d" % [key.x, key.y]
 
 
 func _slot_at(position: Vector2) -> Vector2i:
@@ -378,11 +504,14 @@ func _card_at(key: Vector2i) -> Dictionary:
 	if key.x < 0 or key.x >= ROWS.size():
 		return {}
 	var row: Dictionary = ROWS[key.x]
+	var slots_count := int(row["slots"])
+	if key.y < 0 or key.y >= slots_count:
+		return {}
 	var raw: Variant = _board.get(str(row["board_key"]), [])
 	if not (raw is Array):
 		return {}
 	var slots: Array = raw
-	if key.y < 0 or key.y >= slots.size():
+	if key.y >= slots.size():
 		return {}
 	var card: Variant = slots[key.y]
 	return card if card is Dictionary else {}
@@ -396,18 +525,27 @@ func _on_mouse_exited() -> void:
 	queue_redraw()
 
 
+func _on_focus_entered() -> void:
+	if _focused.x < 0:
+		_focused = _first_card()
+	if _focused.x >= 0:
+		_hover = _focused
+		tooltip_text = _tooltip_for(_focused)
+	queue_redraw()
+
+
+func _on_focus_exited() -> void:
+	_hover = Vector2i(-1, -1)
+	tooltip_text = ""
+	queue_redraw()
+
+
 func _tooltip_for(key: Vector2i) -> String:
 	if key.x < 0 or key.x >= ROWS.size():
 		return ""
 	var row: Dictionary = ROWS[key.x]
-	var raw: Variant = _board.get(str(row["board_key"]), [])
-	if not (raw is Array):
-		return ""
-	var slots: Array = raw
-	if key.y < 0 or key.y >= slots.size():
-		return ""
-	var card: Variant = slots[key.y]
-	if not (card is Dictionary):
+	var card := _card_at(key)
+	if card.is_empty():
 		return ""
 
 	var lines: Array[String] = []
@@ -443,5 +581,14 @@ func _tooltip_for(key: Vector2i) -> String:
 		lines.append("稀有牌：不可保留、不可进化")
 	elif str(row["board_key"]) == "legendary":
 		lines.append("传说牌：不可保留、不可进化")
+
+	if _interactive and not _actionable.is_empty():
+		var entry: Dictionary = _actionable.get(_key_text(key), {})
+		var actions: Array[String] = []
+		if bool(entry.get("capture", false)):
+			actions.append("捕捉")
+		if bool(entry.get("reserve", false)):
+			actions.append("保留")
+		lines.append("可执行：" + (" / ".join(actions) if not actions.is_empty() else "当前不可操作"))
 	return "\n".join(lines)
 

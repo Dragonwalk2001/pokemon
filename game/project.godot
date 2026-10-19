@@ -11,10 +11,14 @@ config_version=5
 [application]
 
 config/name="璀璨宝石：宝可梦"
-config/description="回放可视化 + 和 AI 对战的本地 Godot 界面。"
-run/main_scene="res://scenes/main.tscn"
+config/description="标题菜单 + 只读回放 + 和 AI 对战的本地 Godot 界面。"
+run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="res://icon.svg"
+
+[autoload]
+
+AppState="*res://scripts/app_state.gd"
 
 [display]
 

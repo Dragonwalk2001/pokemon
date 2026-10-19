@@ -38,6 +38,7 @@ const SPEED_DEFAULT := 1
 @onready var open_button: Button = $Margin/Root/TopBar/OpenButton
 @onready var reload_button: Button = $Margin/Root/TopBar/ReloadButton
 @onready var battle_button: Button = $Margin/Root/TopBar/BattleButton
+@onready var menu_button: Button = $Margin/Root/TopBar/MenuButton
 @onready var prev_button: Button = $Margin/Root/Timeline/PrevButton
 @onready var play_button: Button = $Margin/Root/Timeline/PlayButton
 @onready var next_button: Button = $Margin/Root/Timeline/NextButton
@@ -70,6 +71,7 @@ var _syncing_slider := false
 
 
 func _ready() -> void:
+	_speed_index = AppState.replay_speed_index
 	_apply_styles()
 	_wire_signals()
 	get_window().min_size = Vector2i(1100, 700)
@@ -88,7 +90,17 @@ func _apply_styles() -> void:
 	Styles.style_button(play_button, true)
 	Styles.style_button(next_button)
 	Styles.style_button(speed_button)
-	for button in [open_button, reload_button, battle_button, prev_button, play_button, next_button, speed_button]:
+	Styles.style_button(menu_button)
+	for button in [
+		open_button,
+		reload_button,
+		battle_button,
+		menu_button,
+		prev_button,
+		play_button,
+		next_button,
+		speed_button,
+	]:
 		button.focus_mode = Control.FOCUS_NONE
 	timeline_slider.focus_mode = Control.FOCUS_NONE
 	for panel in [board_panel, players_panel, supply_panel, action_panel]:
@@ -102,6 +114,7 @@ func _wire_signals() -> void:
 	open_button.pressed.connect(_on_open)
 	reload_button.pressed.connect(_on_reload)
 	battle_button.pressed.connect(_on_battle_pressed)
+	menu_button.pressed.connect(_on_menu_pressed)
 	prev_button.pressed.connect(_on_prev)
 	play_button.pressed.connect(_toggle_play)
 	next_button.pressed.connect(_on_next)
@@ -155,6 +168,10 @@ func _initial_replay_path() -> String:
 	var env_path := OS.get_environment("SPLENDOR_REPLAY")
 	if not env_path.is_empty():
 		return _absolute_path(env_path)
+	if not AppState.replay_path.is_empty():
+		var picked := AppState.replay_path
+		AppState.replay_path = ""
+		return picked
 	return _latest_replay_in_tmp()
 
 
@@ -774,13 +791,23 @@ func _on_reload() -> void:
 
 func _on_battle_pressed() -> void:
 	_stop_playing()
+	AppState.battle_resume = AppState.battle_in_progress
 	get_tree().change_scene_to_file("res://scenes/battle.tscn")
+
+
+func _on_menu_pressed() -> void:
+	_stop_playing()
+	get_tree().change_scene_to_file("res://scenes/menu.tscn")
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if file_dialog.visible:
 		return
 	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	if event.keycode == KEY_ESCAPE:
+		_on_menu_pressed()
+		get_viewport().set_input_as_handled()
 		return
 	match event.keycode:
 		KEY_LEFT:

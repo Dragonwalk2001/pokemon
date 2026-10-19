@@ -1,0 +1,173 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/menu.gd" id="1_menu"]
+
+[node name="Menu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0627451, 0.0745098, 0.101961, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 48
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 48
+theme_override_constants/margin_bottom = 40
+
+[node name="Root" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 34
+
+[node name="Brand" type="VBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Margin/Root/Brand"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.909804, 0.929412, 0.968627, 1)
+theme_override_font_sizes/font_size = 56
+text = "璀璨宝石"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Margin/Root/Brand"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.486275, 0.611765, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "宝可梦"
+horizontal_alignment = 1
+
+[node name="Tagline" type="Label" parent="Margin/Root/Brand"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 13
+text = "本地对战 · 单人 AI · 回放"
+horizontal_alignment = 1
+
+[node name="MenuButtons" type="VBoxContainer" parent="Margin/Root"]
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 10
+
+[node name="ContinueButton" type="Button" parent="Margin/Root/MenuButtons"]
+custom_minimum_size = Vector2(320, 46)
+layout_mode = 2
+text = "继续对局"
+
+[node name="NewGameButton" type="Button" parent="Margin/Root/MenuButtons"]
+custom_minimum_size = Vector2(320, 46)
+layout_mode = 2
+text = "新对局"
+
+[node name="ReplayButton" type="Button" parent="Margin/Root/MenuButtons"]
+custom_minimum_size = Vector2(320, 46)
+layout_mode = 2
+text = "观看回放"
+
+[node name="SettingsButton" type="Button" parent="Margin/Root/MenuButtons"]
+custom_minimum_size = Vector2(320, 46)
+layout_mode = 2
+text = "设置"
+
+[node name="QuitButton" type="Button" parent="Margin/Root/MenuButtons"]
+custom_minimum_size = Vector2(320, 46)
+layout_mode = 2
+text = "退出"
+
+[node name="Footer" type="Label" parent="Margin/Root"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45098, 0.501961, 0.588235, 1)
+theme_override_font_sizes/font_size = 12
+text = "方向键 / Tab 选择 · Enter 确认 · Esc 返回"
+horizontal_alignment = 1
+
+[node name="Overlay" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Dim" type="ColorRect" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0196078, 0.027451, 0.0431373, 0.74)
+
+[node name="Center" type="CenterContainer" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Modal" type="PanelContainer" parent="Overlay/Center"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Overlay/Center/Modal"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ModalTitle" type="Label" parent="Overlay/Center/Modal/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "新对局"
+
+[node name="ModalBody" type="VBoxContainer" parent="Overlay/Center/Modal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ModalOptions" type="VBoxContainer" parent="Overlay/Center/Modal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ModalFooter" type="HBoxContainer" parent="Overlay/Center/Modal/VBox"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 8
+
+[node name="CancelButton" type="Button" parent="Overlay/Center/Modal/VBox/ModalFooter"]
+layout_mode = 2
+text = "取消"
+
+[node name="ConfirmButton" type="Button" parent="Overlay/Center/Modal/VBox/ModalFooter"]
+custom_minimum_size = Vector2(132, 0)
+layout_mode = 2
+text = "开始对局"
+
+[node name="FileDialog" type="FileDialog" parent="."]
+title = "选择回放 JSON"
+size = Vector2i(960, 620)
+visible = false
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.json ; 回放 JSON")

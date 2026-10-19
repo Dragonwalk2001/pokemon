@@ -14,6 +14,7 @@ Godot 里另有：
 
 | 模式 | 操作方式 | 是否记录回放 |
 |---|---|---|
+| 标题菜单 | 启动后的主场景：继续 / 新对局 / 观看回放 / 设置 | 不适用 |
 | 回放 | 读取 `tmp/*.json` 逐帧查看 | 不适用 |
 | 和 AI 对战 | 图形界面操作，1 人 + 2–3 bot；后端 `serve` 执行规则与 AI | 是，终局自动写 `tmp/pve-<seed>-<n>p.*` |
 
@@ -180,22 +181,26 @@ HTML 是单个自包含文件，没有服务器、CDN 或联网请求。支持�
 
 ## 5. Godot 回放可视化
 
-`game/` 是独立的 Godot 4.6 工程：回放场景读取 `bot-vs-bot` / `pve` 写出的同一份回放 JSON，逐动作绘制场上牌、供应区、玩家与事件；另有交互式的「和 AI 对战」场景（见 §6）。回放界面只读，不建游戏、不改规则；私密信息按后端约定处理——`reserved` 只显示当前查看者可见的保留牌（自己的全部、对手从场上保留的牌），对手从牌堆顶保留的牌只显示数量。
+`game/` 是独立的 Godot 4.6 工程，主场景是标题菜单（`scenes/menu.tscn`）：继续对局、新对局、观看回放、设置、退出。回放场景（`scenes/replay.tscn`）读取 `bot-vs-bot` / `pve` 写出的回放 JSON，逐动作绘制场上牌、供应区、玩家与事件；交互式 PvE 见 §6。回放界面只读，不建游戏、不改规则；私密信息按后端约定处理——`reserved` 只显示当前查看者可见的保留牌（自己的全部、对手从场上保留的牌），对手从牌堆顶保留的牌只显示数量。
 
 在仓库根目录启动（本工作副本的 Godot 4.6 可执行文件在仓库上一级）：
 
 ```bash
+# 打开标题菜单（主场景）
 ../Godot_v4.6.1-stable_win64.exe --path game
+
+# 直接打开回放场景
+../Godot_v4.6.1-stable_win64.exe --path game res://scenes/replay.tscn
 ```
 
 `godot` 已在 `PATH` 时用 `godot --path game`。
 
-- 首次打开会自动载入仓库 `tmp/` 下最新的 `*.json`；没有回放时显示空状态，点「打开回放…」选文件。
+- 回放路径解析：命令行 `-- <path>` > `SPLENDOR_REPLAY` > 菜单选择（`AppState.replay_path`）> 仓库 `tmp/` 下最新的 `*.json` > 空状态（点「打开回放…」选文件）。
 - 场上牌与 HTML 回放同款卡面：减免色底、中央完整名字大字、右上角分数、左下角捕捉费用球。
 - 载入指定回放：
 
   ```bash
-  ../Godot_v4.6.1-stable_win64.exe --path game -- tmp/bot-42-2p.json
+  ../Godot_v4.6.1-stable_win64.exe --path game res://scenes/replay.tscn -- tmp/bot-42-2p.json
   ```
 
   也可以用环境变量 `SPLENDOR_REPLAY=tmp/bot-42-2p.json`。
@@ -206,8 +211,9 @@ HTML 是单个自包含文件，没有服务器、CDN 或联网请求。支持�
   | `←` / `→` | 上一帧 / 下一帧 |
   | `空格` / `P` | 自动播放 / 暂停 |
   | `Home` / `End` | 首帧 / 末帧 |
+  | `Esc` | 返回标题菜单 |
   | 进度条 | 任意跳转 |
-  | 速度 | 慢 / 中 / 快 / 极快 |
+  | 速度 | 慢 / 中 / 快 / 极快（默认值来自设置） |
   | 打开回放… / 重新载入 | 选择任意回放 JSON / 重读当前文件 |
   | 悬停场上牌 | 显示完整卡牌 tooltip |
   | 悬停玩家面板 | 显示该玩家的完整捕捉 / 保留列表 |
@@ -219,40 +225,45 @@ HTML 是单个自包含文件，没有服务器、CDN 或联网请求。支持�
 
 `game/scenes/battle.tscn` 是交互式 PvE：你是玩家 0，对手是 2–3 个 bot。规则判定、AI 决策与回放记录全部在 Rust 后端，Godot 只发送动作并渲染引擎返回的 `GameView`，不复制规则。服务只监听 `127.0.0.1`，没有联网或远程 PvP。
 
-启动方式二选一：
+从标题菜单进入：「新对局」设置对手数量（2 / 3）、对手强度与随机种子；「继续对局」在存在进行中对局时可用，通过 `GET /api/game/state` 恢复。也可以直接打开对战场景，跳过菜单并使用默认设置（2 个 AI、极小化极大、种子 42）：
 
 ```bash
-# 方式 A：先启动本地服务，再打开 Godot 对战场景
+# 方式 A：先启动本地服务，再打开对战场景
 cd backend
 cargo run -p splendor-pokemon-cli -- serve          # 默认 127.0.0.1:43110
 cd ..
 ../Godot_v4.6.1-stable_win64.exe --path game res://scenes/battle.tscn
 
-# 方式 B：直接打开 Godot 主场景，点右上角「和 AI 对战」
+# 方式 B：打开标题菜单，从「新对局」进入
 ../Godot_v4.6.1-stable_win64.exe --path game
 ```
 
-方式 B 发现默认端口没有服务时，会尝试启动 `backend/target/{debug,release}/splendor-pokemon[.exe]`；该可执行文件不存在时退回 `cargo run`（首次需要编译，界面会显示启动状态）。可以用环境变量覆盖：
+菜单进入对战、而对战场景发现默认端口没有服务时，会尝试启动 `backend/target/{debug,release}/splendor-pokemon[.exe]`；该可执行文件不存在时退回 `cargo run`（首次需要编译，界面会显示启动状态）。可以用环境变量覆盖：
 
 | 环境变量 | 说明 |
 |---|---|
 | `SPLENDOR_SERVER_URL` | 直接连接指定地址，例如 `http://127.0.0.1:43110`；设置后 Godot 不再自动启动服务 |
 | `SPLENDOR_CLI` | 指定 `splendor-pokemon` 可执行文件路径，供自动启动使用 |
 
-界面操作：
+交互模型是「点对象 → 就地选项或行动篮 → 底栏确认」：
 
 | 操作 | 说明 |
 |---|---|
-| 场上牌左键 | 选中卡牌，在右侧出现「捕捉 / 保留」按钮 |
-| 场上牌右键 | 直接尝试保留 |
-| 供应区颜色 | 点击循环 `0 → 1 → 2 → 0`；「拿取所选」提交拿 3 色或拿 2 同色 |
-| 我的保留牌 | 点击尝试捕捉 |
-| 弃球阶段 | 点击颜色循环选择弃球数量，达到要求后「确认弃球」 |
-| 进化阶段 | 按钮列出合法进化目标，「结束回合」跳过进化 |
-| 顶栏 | 选择 AI 数量 / 策略 / 种子；「新对局」重开；「回放」返回只读回放界面 |
+| 场上牌（左键 / 右键） | 选中；卡片抬起，正下方弹出「捕捉 / 保留」，不可用按钮置灰并写出缺球原因 |
+| 精灵球 | 左键 +1、右键 −1，放入底栏行动篮；同色最多 2、总数最多 3，同色第 2 个要求该色供应至少 4 |
+| 底栏确认 | 文案带具体内容（如「拿取 红×2 蓝×1」），不合法时禁用 |
+| 我的保留牌 | 点击直接捕捉；不合法置灰 |
+| 底栏「弃球…」 | 打开球架：持有区左键 +1 / 右键 −1，弃球区点击取回；正好降到 10 才能确认 |
+| 底栏「进化…」 | 列出合法进化；「结束回合」在进化阶段常驻 |
+| `数字 1–5` | 快速选择对应颜色精灵球 |
+| `Tab` / 方向键 / `Enter` | 在棋盘与按钮间移动焦点，方向键选牌，Enter 选中 |
+| `Esc` | 逐级取消（模态 → 选中 / 行动篮 → 打开暂停菜单） |
+| 顶栏「菜单」 | 继续 / 重新开始（二次确认）/ 返回标题（二次确认，可从菜单继续） |
+| 顶栏状态 | 阶段、当前行动者、种子、AI 数量与强度；不承载开局参数 |
 
-- 人类动作后，服务端连续推进 bot 回合，界面按返回的步骤逐个播放；再次轮到人类时才恢复操作。
-- 终局或规则僵局会显示横幅；完成后自动写入 `tmp/pve-<seed>-<n>p.json` 与同名 `.html`。
+- 非我方回合棋盘不可点，顶栏显示「等待对手」；AI 动作按返回的 `steps` 逐个播放，播完才恢复操作。
+- 终局 / 僵局显示居中结算面板；完成后自动写入 `tmp/pve-<seed>-<n>p.json` 与同名 `.html`，可保存回放、再来一局或返回标题。
+- 设置（标题菜单）保存 AI 行动速度与回放默认速度到 `user://settings.cfg`，不影响规则。
 - 本地接口：`GET /api/health`、`GET /api/game/state`、`POST /api/game/new`、`POST /api/game/action`、`POST /api/game/replay/save`。请求 / 响应均为 JSON，单会话、不持久化。
 
 ## 验证
@@ -265,11 +276,20 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```
 
-Godot 回放冒烟（在仓库根目录；退出码 0 表示通过）：
+Godot 菜单冒烟（在仓库根目录；退出码 0 表示通过）：
+
+```bash
+SPLENDOR_MENU_SMOKE=1 \
+  ../Godot_v4.6.1-stable_win64_console.exe --headless --path game
+```
+
+检查五个菜单项、「继续对局」禁用状态、新对局设置三行参数、设置页选项与回放文件对话框。
+
+Godot 回放冒烟：
 
 ```bash
 SPLENDOR_SMOKE=1 SPLENDOR_REPLAY=tmp/bot-42-2p.json \
-  ../Godot_v4.6.1-stable_win64_console.exe --headless --path game
+  ../Godot_v4.6.1-stable_win64_console.exe --headless --path game res://scenes/replay.tscn
 ```
 
 冒烟会载入回放、逐帧渲染、检查 5 行牌 / 玩家面板 / 按钮边界 / 播放推进 / 终局横幅 / 布局尺寸 / 中文字形。
@@ -285,7 +305,7 @@ SPLENDOR_BATTLE_SMOKE=1 SPLENDOR_SERVER_URL=http://127.0.0.1:43111 \
   ../Godot_v4.6.1-stable_win64_console.exe --headless --path game res://scenes/battle.tscn
 ```
 
-冒烟会真实调用本地服务：开局、检查棋盘 / 玩家 / 供应区、校验界面构造的拿球与保留动作、提交一次拿球和结束回合、确认 AI 回合后回到人类，并检查中文字形。
+冒烟会真实调用本地服务：开局、检查对手面板 / 棋盘 / 球架 / 行动底栏、校验行动篮拼出的拿球动作、检查贴卡动作条、提交一次拿球和结束回合、打开进化 / 弃球 / 暂停模态，并检查中文字形。
 
 更详细的模块与设计说明见 [`backend/README.md`](backend/README.md)；Godot 工程结构见 [`game/README.md`](game/README.md)。
 
