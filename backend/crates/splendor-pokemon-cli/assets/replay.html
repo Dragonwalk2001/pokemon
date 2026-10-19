@@ -328,8 +328,36 @@
     return wrap;
   }
 
+  // 完整进化链（`迷你龙 → 【哈克龙】 → 快龙`）；旧回放缺少 evolution_line 时回退到下一形态。
+  function evolutionLine(card) {
+    const steps = Array.isArray(card.evolution_line) ? card.evolution_line : [];
+    if (steps.length > 1) {
+      return steps
+        .map((step) => (step.name_zh === card.name_zh ? `【${step.name_zh}】` : step.name_zh))
+        .join(" → ");
+    }
+    return card.evolves_to_zh ? `→ ${card.evolves_to_zh}` : "";
+  }
+
+  // 单卡说明：名称 / 分数 / 减免 / 费用 / 进化门槛 / 进化链，用于悬停提示。
+  function cardDetail(card) {
+    const lines = [`${card.name_zh} ${card.points}分`, `减免 ${colorLabel(card.bonus_color)}+${card.bonus_count}`];
+    const cost = COLORS
+      .filter((color) => (card.cost?.[color.key] || 0) > 0)
+      .map((color) => `${color.label}${card.cost[color.key]}`);
+    lines.push(`费用 ${cost.length ? cost.join(" ") : "免费"}`);
+    if (card.evolves_to_zh && card.evolution_requirement) {
+      const requirement = card.evolution_requirement;
+      lines.push(`进化 → ${card.evolves_to_zh}（需 ${requirement.count}${colorLabel(requirement.color)}减免）`);
+    }
+    const chain = evolutionLine(card);
+    if (chain) lines.push(`进化链 ${chain}`);
+    return lines;
+  }
+
   function cardNode(card) {
     const element = node("div", `card ${card.category} bonus-${card.bonus_color}`);
+    element.title = cardDetail(card).join("\n");
     const head = node("div", "card-head");
     head.append(node("span", "card-cat", categoryLabel(card.category)));
     const points = node("span", card.points > 0 ? "points" : "points zero", `${card.points}`);
@@ -428,7 +456,9 @@
     const captured = node("div", "chips");
     if (player.captured.length) {
       for (const card of player.captured) {
-        captured.append(node("span", "chip", `${card.name_zh} ${card.points}分`));
+        const chip = node("span", "chip", `${card.name_zh} ${card.points}分`);
+        chip.title = cardDetail(card).join("\n");
+        captured.append(chip);
       }
     } else {
       captured.append(node("span", "chip", "尚无宝可梦"));
@@ -439,7 +469,9 @@
       const reserved = node("div", "chips");
       const visible = Array.isArray(player.reserved) ? player.reserved : [];
       for (const card of visible) {
-        reserved.append(node("span", "chip", `保留：${card.name_zh} ${card.points}分`));
+        const chip = node("span", "chip", `保留：${card.name_zh} ${card.points}分`);
+        chip.title = cardDetail(card).join("\n");
+        reserved.append(chip);
       }
       const hidden = Math.max(0, (player.reserved_count || 0) - visible.length);
       if (hidden > 0) {

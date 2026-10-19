@@ -121,94 +121,107 @@ bbcode_enabled = false
 scroll_following = true
 selection_enabled = true
 
-[node name="Side" type="VBoxContainer" parent="Margin/Root/Body"]
-custom_minimum_size = Vector2(322, 0)
+[node name="Side" type="ScrollContainer" parent="Margin/Root/Body"]
+custom_minimum_size = Vector2(372, 0)
 layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="SideScroll" type="VBoxContainer" parent="Margin/Root/Body/Side"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="OpponentsPanel" type="PanelContainer" parent="Margin/Root/Body/Side"]
-custom_minimum_size = Vector2(0, 150)
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/OpponentsPanel"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/OpponentsPanel/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "对手"
-
-[node name="OpponentsBox" type="VBoxContainer" parent="Margin/Root/Body/Side/OpponentsPanel/VBox"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 6
-
-[node name="SupplyPanel" type="PanelContainer" parent="Margin/Root/Body/Side"]
+[node name="MePanel" type="PanelContainer" parent="Margin/Root/Body/Side/SideScroll"]
 layout_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/SupplyPanel"]
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/SideScroll/MePanel"]
 layout_mode = 2
 theme_override_constants/separation = 5
 
-[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/SupplyPanel/VBox"]
+[node name="MeHead" type="HBoxContainer" parent="Margin/Root/Body/Side/SideScroll/MePanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MeTokens" type="HFlowContainer" parent="Margin/Root/Body/Side/SideScroll/MePanel/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
+
+[node name="MeStats" type="Label" parent="Margin/Root/Body/Side/SideScroll/MePanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="MeCards" type="HFlowContainer" parent="Margin/Root/Body/Side/SideScroll/MePanel/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 4
+
+[node name="SupplyPanel" type="PanelContainer" parent="Margin/Root/Body/Side/SideScroll"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/SideScroll/SupplyPanel"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/SideScroll/SupplyPanel/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
 theme_override_font_sizes/font_size = 12
 text = "精灵球 · 左键 +1 / 右键 −1"
 
-[node name="SupplyView" type="Control" parent="Margin/Root/Body/Side/SupplyPanel/VBox"]
+[node name="SupplyView" type="Control" parent="Margin/Root/Body/Side/SideScroll/SupplyPanel/VBox"]
 custom_minimum_size = Vector2(0, 62)
 layout_mode = 2
 script = ExtResource("3_tokens")
 
-[node name="SupplyHint" type="Label" parent="Margin/Root/Body/Side/SupplyPanel/VBox"]
+[node name="SupplyHint" type="Label" parent="Margin/Root/Body/Side/SideScroll/SupplyPanel/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.45098, 0.501961, 0.588235, 1)
 theme_override_font_sizes/font_size = 11
 text = "最多拿 3 个：三种颜色各 1，或同色 2 个（该色需至少 4 个）。"
 autowrap_mode = 2
 
-[node name="ReservedPanel" type="PanelContainer" parent="Margin/Root/Body/Side"]
+[node name="ReservedPanel" type="PanelContainer" parent="Margin/Root/Body/Side/SideScroll"]
 layout_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/ReservedPanel"]
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/SideScroll/ReservedPanel"]
 layout_mode = 2
 theme_override_constants/separation = 5
 
-[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/ReservedPanel/VBox"]
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/SideScroll/ReservedPanel/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
 theme_override_font_sizes/font_size = 12
-text = "我的保留牌 · 点击捕捉"
+text = "我的保留牌 · 点捕捉"
 
-[node name="ReservedRow" type="HFlowContainer" parent="Margin/Root/Body/Side/ReservedPanel/VBox"]
+[node name="ReservedRow" type="VBoxContainer" parent="Margin/Root/Body/Side/SideScroll/ReservedPanel/VBox"]
 layout_mode = 2
-theme_override_constants/h_separation = 5
-theme_override_constants/v_separation = 4
+theme_override_constants/separation = 4
 
-[node name="MePanel" type="PanelContainer" parent="Margin/Root/Body/Side"]
+[node name="OpponentsPanel" type="PanelContainer" parent="Margin/Root/Body/Side/SideScroll"]
+custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/MePanel"]
+[node name="VBox" type="VBoxContainer" parent="Margin/Root/Body/Side/SideScroll/OpponentsPanel"]
 layout_mode = 2
-theme_override_constants/separation = 5
+theme_override_constants/separation = 6
 
-[node name="MeHead" type="HBoxContainer" parent="Margin/Root/Body/Side/MePanel/VBox"]
+[node name="SectionLabel" type="Label" parent="Margin/Root/Body/Side/SideScroll/OpponentsPanel/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
+theme_override_font_sizes/font_size = 12
+text = "对手 · 悬停查看完整信息"
 
-[node name="MeTokens" type="HFlowContainer" parent="Margin/Root/Body/Side/MePanel/VBox"]
+[node name="OpponentsBox" type="VBoxContainer" parent="Margin/Root/Body/Side/SideScroll/OpponentsPanel/VBox"]
 layout_mode = 2
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 4
+theme_override_constants/separation = 6
 
-[node name="MeCards" type="HFlowContainer" parent="Margin/Root/Body/Side/MePanel/VBox"]
+[node name="Spacer" type="Control" parent="Margin/Root/Body/Side/SideScroll"]
 layout_mode = 2
-theme_override_constants/h_separation = 5
-theme_override_constants/v_separation = 4
+size_flags_vertical = 3
 
 [node name="ActionDock" type="PanelContainer" parent="Margin/Root"]
 custom_minimum_size = Vector2(0, 92)

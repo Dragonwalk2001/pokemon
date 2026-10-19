@@ -85,9 +85,118 @@ static func clear(container: Node) -> void:
 		child.queue_free()
 
 
-static func card_chip(card: Dictionary, prefix: String = "") -> PanelContainer:
+static func card_chip(
+	card: Dictionary, prefix: String = "", tooltip: String = ""
+) -> PanelContainer:
 	var bonus_key := str(card.get("bonus_color", "red"))
-	return pill(
+	var node := pill(
 		"%s%s %d分" % [prefix, str(card.get("name_zh", "?")), int(card.get("points", 0))],
 		Styles.TOKEN_COLORS.get(bonus_key, Styles.COLOR_ACCENT)
 	)
+	if not tooltip.is_empty():
+		node.tooltip_text = tooltip
+	return node
+
+
+## 进化链文本：`迷你龙 → 【哈克龙】 → 快龙`；mark_current 关闭时去掉【】。
+## 旧回放缺少 `evolution_line` 时退回卡牌自身的 `evolves_to_zh`。
+static func chain_text(card: Dictionary, mark_current: bool = true) -> String:
+	var current := str(card.get("name_zh", "?"))
+	var names: Array[String] = []
+	var steps: Variant = card.get("evolution_line", [])
+	if steps is Array:
+		for step_v in steps:
+			if step_v is Dictionary:
+				names.append(str((step_v as Dictionary).get("name_zh", "?")))
+	if names.size() > 1:
+		var parts: Array[String] = []
+		for name in names:
+			parts.append("【%s】" % name if mark_current and name == current else name)
+		return " → ".join(parts)
+	var next := str(card.get("evolves_to_zh", ""))
+	return "→ %s" % next if not next.is_empty() else ""
+
+
+## 下一阶段形态名；已是最终形态或不在进化链里时返回空串。
+static func next_evolution_name(card: Dictionary) -> String:
+	var current := str(card.get("name_zh", "?"))
+	var steps: Variant = card.get("evolution_line", [])
+	if steps is Array:
+		var found := false
+		for step_v in steps:
+			if not (step_v is Dictionary):
+				continue
+			var name := str((step_v as Dictionary).get("name_zh", "?"))
+			if found:
+				return name
+			if name == current:
+				found = true
+	return str(card.get("evolves_to_zh", ""))
+
+
+## 进化门槛文本，例如 `黄 4`；没有门槛时返回空串。
+static func evolution_requirement_text(card: Dictionary) -> String:
+	var raw: Variant = card.get("evolution_requirement")
+	if not (raw is Dictionary):
+		return ""
+	var requirement: Dictionary = raw
+	var count := int(requirement.get("count", 0))
+	if count <= 0:
+		return ""
+	var color := str(requirement.get("color", ""))
+	return "%s %d" % [Styles.COLOR_LABELS.get(color, color), count]
+
+
+## 费用文本，例如 `蓝4 黄1`；免费返回 `免费`。
+static func cost_text(card: Dictionary) -> String:
+	var parts: Array[String] = []
+	var raw: Variant = card.get("cost", {})
+	if raw is Dictionary:
+		var cost: Dictionary = raw
+		for key in Styles.COLOR_KEYS:
+			var count := int(cost.get(key, 0))
+			if count > 0:
+				parts.append("%s%d" % [Styles.COLOR_LABELS.get(key, key), count])
+	return " ".join(parts) if not parts.is_empty() else "免费"
+
+
+## 减免文本，例如 `黑+1`。
+static func bonus_text(card: Dictionary) -> String:
+	var key := str(card.get("bonus_color", "red"))
+	return "%s+%d" % [Styles.COLOR_LABELS.get(key, key), int(card.get("bonus_count", 0))]
+
+
+## 面板 tooltip 里的一张牌：名称 / 分数 / 减免 / 费用 / 进化门槛与进度 / 进化链。
+static func detail_lines(
+	card: Dictionary, bonuses: Dictionary, prefix: String = "· "
+) -> Array[String]:
+	var lines: Array[String] = []
+	lines.append("%s%s %d分 ｜ 减免 %s ｜ 费 %s" % [
+		prefix,
+		str(card.get("name_zh", "?")),
+		int(card.get("points", 0)),
+		bonus_text(card),
+		cost_text(card),
+	])
+	var next := next_evolution_name(card)
+	if not next.is_empty():
+		var progress := ""
+		var requirement: Variant = card.get("evolution_requirement")
+		if requirement is Dictionary:
+			var color := str((requirement as Dictionary).get("color", ""))
+			var needed := int((requirement as Dictionary).get("count", 0))
+			progress = "%s %d/%d" % [
+				Styles.COLOR_LABELS.get(color, color),
+				int(bonuses.get(color, 0)),
+				needed,
+			]
+		lines.append("  进化 → %s（需 %s）｜ 减免进度 %s" % [
+			next,
+			evolution_requirement_text(card),
+			progress,
+		])
+	var chain := chain_text(card)
+	if not chain.is_empty():
+		lines.append("  进化链：" + chain)
+	return lines
+

@@ -12,6 +12,7 @@ extends Control
 ## 完成后按 0 / 1 退出。
 
 const Styles := preload("res://scripts/ui/styles.gd")
+const Widgets := preload("res://scripts/ui/widgets.gd")
 
 const PHASES := {
 	"main_action": "主要行动",
@@ -451,7 +452,7 @@ func _build_player_panel(player: Dictionary, current_id: int, game_over: bool) -
 		for i in captured_limit:
 			var card_v: Variant = captured[i]
 			if card_v is Dictionary:
-				cards_row.add_child(_card_chip(card_v, false))
+				cards_row.add_child(_card_chip(card_v, false, bonuses))
 		if captured.size() > captured_limit:
 			cards_row.add_child(_chip("… +%d" % (captured.size() - captured_limit)))
 
@@ -463,7 +464,7 @@ func _build_player_panel(player: Dictionary, current_id: int, game_over: bool) -
 			for i in reserved_limit:
 				var card_v: Variant = reserved[i]
 				if card_v is Dictionary:
-					cards_row.add_child(_card_chip(card_v, true))
+					cards_row.add_child(_card_chip(card_v, true, bonuses))
 			if reserved.size() > reserved_limit:
 				cards_row.add_child(_chip("… +%d" % (reserved.size() - reserved_limit)))
 			if hidden_reserved > 0:
@@ -592,7 +593,9 @@ func _badge(text: String) -> PanelContainer:
 	return badge
 
 
-func _card_chip(card: Dictionary, reserved: bool) -> PanelContainer:
+func _card_chip(
+	card: Dictionary, reserved: bool, bonuses: Dictionary = {}
+) -> PanelContainer:
 	var bonus_key := str(card.get("bonus_color", "red"))
 	var prefix := "保留 " if reserved else ""
 	var text := "%s%s %d分" % [
@@ -600,7 +603,10 @@ func _card_chip(card: Dictionary, reserved: bool) -> PanelContainer:
 		str(card.get("name_zh", "?")),
 		int(card.get("points", 0)),
 	]
-	return _pill(text, Styles.TOKEN_COLORS.get(bonus_key, Styles.COLOR_ACCENT))
+	var chip := _pill(text, Styles.TOKEN_COLORS.get(bonus_key, Styles.COLOR_ACCENT))
+	chip.tooltip_text = "\n".join(Widgets.detail_lines(card, bonuses, prefix))
+	return chip
+
 
 
 func _player_tooltip(
@@ -610,48 +616,44 @@ func _player_tooltip(
 	reserved_visible: bool
 ) -> String:
 	var lines: Array[String] = []
-	lines.append("%s · %d 分" % [
+	var points := int(player.get("points", 0))
+	lines.append("%s · %d 分 · %s" % [
 		str(player.get("name", "?")),
-		int(player.get("points", 0)),
+		points,
+		"已达 18 分结算线" if points >= 18 else "距 18 分还差 %d" % (18 - points),
 	])
 
+	var bonuses: Dictionary = {}
+	var bonuses_v: Variant = player.get("bonuses", {})
+	if bonuses_v is Dictionary:
+		bonuses = bonuses_v
 	var bonus_parts: Array[String] = []
-	var bonuses: Dictionary = player.get("bonuses", {})
 	for key in ["red", "blue", "yellow", "pink", "black"]:
 		var count := int(bonuses.get(key, 0))
 		if count > 0:
 			bonus_parts.append("%s%d" % [Styles.COLOR_LABELS[key], count])
 	lines.append("减免：" + (" ".join(bonus_parts) if not bonus_parts.is_empty() else "无"))
 
-	var captured_parts: Array[String] = []
+	lines.append("捕捉 %d 张：" % captured.size())
+	if captured.is_empty():
+		lines.append("· 无")
 	for card_v in captured:
 		if card_v is Dictionary:
-			var card: Dictionary = card_v
-			captured_parts.append("%s(%d)" % [
-				str(card.get("name_zh", "?")),
-				int(card.get("points", 0)),
-			])
-	lines.append("捕捉 %d 张：%s" % [
-		captured.size(),
-		"、".join(captured_parts) if not captured_parts.is_empty() else "无",
-	])
+			lines.append_array(Widgets.detail_lines(card_v, bonuses))
 
 	var reserved_count := int(player.get("reserved_count", 0))
 	var hidden_reserved := maxi(0, reserved_count - reserved.size())
+	lines.append("保留 %d 张：" % reserved_count)
 	if reserved_visible:
-		var reserved_parts: Array[String] = []
+		if reserved.is_empty():
+			lines.append("· 无可见牌面")
 		for card_v in reserved:
 			if card_v is Dictionary:
-				var card: Dictionary = card_v
-				reserved_parts.append(str(card.get("name_zh", "?")))
+				lines.append_array(Widgets.detail_lines(card_v, bonuses))
 		if hidden_reserved > 0:
-			reserved_parts.append("%d 张未公开" % hidden_reserved)
-		lines.append("保留 %d 张：%s" % [
-			reserved_count,
-			"、".join(reserved_parts) if not reserved_parts.is_empty() else "无",
-		])
+			lines.append("· %d 张从牌堆顶保留，牌面未公开" % hidden_reserved)
 	else:
-		lines.append("保留：%d 张（未公开）" % reserved_count)
+		lines.append("· %d 张全部未公开" % reserved_count)
 	return "\n".join(lines)
 
 

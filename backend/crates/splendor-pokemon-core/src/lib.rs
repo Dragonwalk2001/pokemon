@@ -31,7 +31,7 @@ pub use heuristic_v1::HeuristicV1Bot;
 pub use minimax::MinimaxBot;
 pub use replay::{Replay, ReplayFrame, ReplayRecorder, ReplayResult, REPLAY_VERSION};
 pub use types::{
-    Action, Card, CardId, CardSource, Category, Color, Event, EvolutionRequirement, Phase, Player,
-    PlayerId, ReservedCard, TokenCounts,
+    Action, Card, CardId, CardSource, Category, Color, Event, EvolutionRequirement, EvolutionStep,
+    Phase, Player, PlayerId, ReservedCard, TokenCounts,
 };
 pub use view::{BoardView, GameView, PlayerView};

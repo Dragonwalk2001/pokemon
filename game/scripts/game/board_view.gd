@@ -12,6 +12,7 @@ extends Control
 signal slot_clicked(row: int, slot: int, card: Dictionary)
 
 const Styles := preload("res://scripts/ui/styles.gd")
+const Widgets := preload("res://scripts/ui/widgets.gd")
 
 const ROWS := [
 	{"board_key": "level1", "label": "1阶", "accent": Color("6f8f66"), "slots": 4},
@@ -574,6 +575,10 @@ func _tooltip_for(key: Vector2i) -> String:
 			if count > 0:
 				cost_parts.append("%s%d" % [Styles.COLOR_LABELS.get(color_key, "?"), count])
 	lines.append("费用：" + (" ".join(cost_parts) if not cost_parts.is_empty() else "免费"))
+
+	var chain := Widgets.chain_text(card)
+	if not chain.is_empty():
+		lines.append("进化链：" + chain)
 
 	var evolves_to := str(card.get("evolves_to_zh", ""))
 	var requirement_raw: Variant = card.get("evolution_requirement")

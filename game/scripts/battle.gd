@@ -32,20 +32,33 @@ const PHASES := {
 }
 const COLOR_KEYS := ["red", "blue", "yellow", "pink", "black"]
 const BOARD_CATEGORIES := ["level1", "level2", "level3", "rare", "legendary"]
+const BOARD_LABELS := {
+	"level1": "1阶",
+	"level2": "2阶",
+	"level3": "3阶",
+	"rare": "稀有",
+	"legendary": "传说",
+}
 const RESERVE_LIMIT := 3
+const WIN_POINTS := 18
 
 @onready var phase_badge: Label = $Margin/Root/TopBar/PhaseBadge
 @onready var meta_label: Label = $Margin/Root/TopBar/Meta
 @onready var pause_button: Button = $Margin/Root/TopBar/PauseButton
 @onready var board_view: Control = $Margin/Root/Body/BoardColumn/BoardPanel/VBox/BoardView
 @onready var events_label: RichTextLabel = $Margin/Root/Body/BoardColumn/LogPanel/VBox/Events
-@onready var opponents_box: VBoxContainer = $Margin/Root/Body/Side/OpponentsPanel/VBox/OpponentsBox
-@onready var supply_view: Control = $Margin/Root/Body/Side/SupplyPanel/VBox/SupplyView
-@onready var supply_hint: Label = $Margin/Root/Body/Side/SupplyPanel/VBox/SupplyHint
-@onready var reserved_row: HFlowContainer = $Margin/Root/Body/Side/ReservedPanel/VBox/ReservedRow
-@onready var me_head: HBoxContainer = $Margin/Root/Body/Side/MePanel/VBox/MeHead
-@onready var me_tokens: HFlowContainer = $Margin/Root/Body/Side/MePanel/VBox/MeTokens
-@onready var me_cards: HFlowContainer = $Margin/Root/Body/Side/MePanel/VBox/MeCards
+@onready var opponents_box: VBoxContainer = (
+	$Margin/Root/Body/Side/SideScroll/OpponentsPanel/VBox/OpponentsBox
+)
+@onready var supply_view: Control = $Margin/Root/Body/Side/SideScroll/SupplyPanel/VBox/SupplyView
+@onready var supply_hint: Label = $Margin/Root/Body/Side/SideScroll/SupplyPanel/VBox/SupplyHint
+@onready var reserved_row: VBoxContainer = (
+	$Margin/Root/Body/Side/SideScroll/ReservedPanel/VBox/ReservedRow
+)
+@onready var me_head: HBoxContainer = $Margin/Root/Body/Side/SideScroll/MePanel/VBox/MeHead
+@onready var me_tokens: HFlowContainer = $Margin/Root/Body/Side/SideScroll/MePanel/VBox/MeTokens
+@onready var me_stats: Label = $Margin/Root/Body/Side/SideScroll/MePanel/VBox/MeStats
+@onready var me_cards: HFlowContainer = $Margin/Root/Body/Side/SideScroll/MePanel/VBox/MeCards
 @onready var prompt_label: Label = $Margin/Root/ActionDock/VBox/PromptRow/PromptLabel
 @onready var basket_label: Label = $Margin/Root/ActionDock/VBox/PromptRow/BasketLabel
 @onready var end_turn_button: Button = $Margin/Root/ActionDock/VBox/ButtonRow/EndTurnButton
@@ -132,10 +145,10 @@ func _apply_styles() -> void:
 	for path in [
 		"Margin/Root/Body/BoardColumn/BoardPanel",
 		"Margin/Root/Body/BoardColumn/LogPanel",
-		"Margin/Root/Body/Side/OpponentsPanel",
-		"Margin/Root/Body/Side/SupplyPanel",
-		"Margin/Root/Body/Side/ReservedPanel",
-		"Margin/Root/Body/Side/MePanel",
+		"Margin/Root/Body/Side/SideScroll/MePanel",
+		"Margin/Root/Body/Side/SideScroll/SupplyPanel",
+		"Margin/Root/Body/Side/SideScroll/ReservedPanel",
+		"Margin/Root/Body/Side/SideScroll/OpponentsPanel",
 		"Margin/Root/ActionDock",
 	]:
 		var panel := get_node(path) as PanelContainer
@@ -701,9 +714,10 @@ func _render_dock() -> void:
 		prompt_label.text = "可以进化一只宝可梦，或直接结束回合。"
 	elif phase == "main_action":
 		if not card.is_empty():
-			prompt_label.text = "已选「%s」：用卡片下方的按钮捕捉或保留。" % str(
-				card.get("name_zh", "?")
-			)
+			prompt_label.text = "已选「%s」：实付 %s；用卡片下方的按钮捕捉或保留。" % [
+				str(card.get("name_zh", "?")),
+				_payment_text(card),
+			]
 		elif picking:
 			prompt_label.text = "行动篮已选 %d 个球：确认拿取，或继续选择。" % _pick_total(
 				_supply_pick
@@ -794,30 +808,72 @@ func _opponent_panel(player: Dictionary, current_id: int, game_over: bool) -> Pa
 	var tokens: Dictionary = player.get("tokens", {})
 	vbox.add_child(_ball_row(tokens))
 
-	var stats := "减免 %s ｜ 捕捉 %d · 保留 %d/%d · 进化 %d" % [
+	var stats := "减免 %s ｜ 捕捉 %d · 保留 %d/%d · 进化 %d · %s" % [
 		_bonus_summary(player.get("bonuses", {})),
 		int(player.get("card_count", 0)),
 		int(player.get("reserved_count", 0)),
 		RESERVE_LIMIT,
 		int(player.get("evolution_count", 0)),
+		_score_gap_text(int(player.get("points", 0))),
 	]
-	vbox.add_child(Widgets.label(stats, 11, Styles.COLOR_MUTED))
+	var stats_label := Widgets.label(stats, 10, Styles.COLOR_MUTED)
+	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(stats_label)
 
+	var bonuses: Dictionary = {}
+	var bonuses_v: Variant = player.get("bonuses", {})
+	if bonuses_v is Dictionary:
+		bonuses = bonuses_v
+
+	# 已捕捉：全部列出，牌面公开；悬停看费用 / 减免 / 进化链。
 	var captured: Array = []
 	var captured_v: Variant = player.get("captured")
 	if captured_v is Array:
 		captured = captured_v
-	if not captured.is_empty():
-		vbox.add_child(Widgets.label(_captured_summary(captured), 11, Styles.COLOR_TEXT))
+	var captured_row := HFlowContainer.new()
+	captured_row.add_theme_constant_override("h_separation", 4)
+	captured_row.add_theme_constant_override("v_separation", 3)
+	vbox.add_child(captured_row)
+	if captured.is_empty():
+		captured_row.add_child(Widgets.chip("尚无宝可梦"))
+	else:
+		for card_v in _sorted_by_points(captured):
+			if card_v is Dictionary:
+				captured_row.add_child(
+					Widgets.card_chip(card_v, "", _card_tooltip(card_v, bonuses, false))
+				)
+
+	# 已预定（保留）牌：可见牌面全部列出，未公开的只给数量。
+	var reserved: Array = []
+	var reserved_v: Variant = player.get("reserved")
+	if reserved_v is Array:
+		reserved = reserved_v
+	var hidden := maxi(0, int(player.get("reserved_count", 0)) - reserved.size())
+	var reserved_row_local := HFlowContainer.new()
+	reserved_row_local.add_theme_constant_override("h_separation", 4)
+	reserved_row_local.add_theme_constant_override("v_separation", 3)
+	vbox.add_child(reserved_row_local)
+	for card_v in reserved:
+		if card_v is Dictionary:
+			reserved_row_local.add_child(
+				Widgets.card_chip(card_v, "保留 ", _card_tooltip(card_v, bonuses, false))
+			)
+	if hidden > 0:
+		var hidden_chip := Widgets.chip("? ×%d" % hidden)
+		hidden_chip.tooltip_text = "对手从牌堆顶保留，牌面未公开；共 %d 张。" % hidden
+		reserved_row_local.add_child(hidden_chip)
+	elif reserved.is_empty():
+		reserved_row_local.add_child(Widgets.chip("无保留牌"))
 	return panel
 
 
 func _render_me() -> void:
 	Widgets.clear(me_head)
-	Widgets.clear(me_cards)
 	Widgets.clear(me_tokens)
+	Widgets.clear(me_cards)
 	var players: Variant = _view.get("players")
 	if not (players is Array) or (players as Array).is_empty():
+		me_stats.text = ""
 		me_tokens.add_child(Widgets.label("精灵球：—", 12, Styles.COLOR_MUTED))
 		return
 	var me: Dictionary = (players as Array)[0]
@@ -826,6 +882,11 @@ func _render_me() -> void:
 	me_head.add_child(Widgets.spacer())
 	me_head.add_child(Widgets.label(str(int(me.get("points", 0))), 22, Styles.COLOR_GOLD))
 	me_head.add_child(Widgets.label("分", 11, Styles.COLOR_MUTED))
+	me_stats.text = "已捕捉 %d 张 · 进化 %d 次 · %s" % [
+		int(me.get("card_count", 0)),
+		int(me.get("evolution_count", 0)),
+		_score_gap_text(int(me.get("points", 0))),
+	]
 
 	var tokens: Dictionary = me.get("tokens", {})
 	var bonuses: Dictionary = me.get("bonuses", {})
@@ -853,16 +914,45 @@ func _render_me() -> void:
 	var captured_v: Variant = me.get("captured")
 	if captured_v is Array:
 		captured = captured_v
-	captured.sort_custom(
-		func(a, b): return int(a.get("points", 0)) > int(b.get("points", 0))
-	)
-	for index in mini(4, captured.size()):
-		if captured[index] is Dictionary:
-			me_cards.add_child(Widgets.card_chip(captured[index]))
-	if captured.size() > 4:
-		me_cards.add_child(Widgets.chip("… +%d" % (captured.size() - 4)))
+	for card_v in _sorted_by_points(captured):
+		if card_v is Dictionary:
+			me_cards.add_child(_captured_tile(card_v))
 	if captured.is_empty():
 		me_cards.add_child(Widgets.chip("尚无宝可梦"))
+
+
+## 已捕捉卡片：卡面直接写进化链与当前减免进度，不依赖悬停。
+func _captured_tile(card: Dictionary) -> PanelContainer:
+	var bonus_key := str(card.get("bonus_color", "red"))
+	var accent: Color = Styles.TOKEN_COLORS.get(bonus_key, Styles.COLOR_ACCENT)
+	var panel := Widgets.panel(Styles.tile_box())
+	panel.tooltip_text = _card_tooltip(card)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 1)
+	panel.add_child(vbox)
+
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 5)
+	vbox.add_child(head)
+	head.add_child(Widgets.dot(accent))
+	head.add_child(Widgets.label(str(card.get("name_zh", "?")), 11, Styles.COLOR_TEXT))
+	head.add_child(Widgets.spacer())
+	head.add_child(Widgets.label("%d分" % int(card.get("points", 0)), 10, Styles.COLOR_GOLD))
+	var progress := _evolution_progress_text(card, _me_bonuses())
+	if not progress.is_empty():
+		var ready := _evolution_ready(card)
+		head.add_child(Widgets.label(
+			("↑ %s" % progress) if ready else progress,
+			9,
+			Styles.COLOR_GOLD if ready else Styles.COLOR_MUTED
+		))
+
+	var chain := Widgets.chain_text(card, false)
+	if not chain.is_empty():
+		vbox.add_child(Widgets.label("链：" + chain, 9, Styles.COLOR_MUTED))
+	return panel
+
+
 func _render_reserved() -> void:
 	Widgets.clear(reserved_row)
 	var players: Variant = _view.get("players")
@@ -878,30 +968,55 @@ func _render_reserved() -> void:
 		return
 	for index in reserved.size():
 		var card_v: Variant = reserved[index]
-		if not (card_v is Dictionary):
-			continue
-		var card: Dictionary = card_v
-		var legal := _is_legal(_capture_reserved(index)) and _can_interact()
-		var button := Button.new()
-		button.text = "捕捉 · %s %d分" % [
-			str(card.get("name_zh", "?")),
-			int(card.get("points", 0)),
-		]
-		button.tooltip_text = _card_tooltip(card)
-		button.disabled = not legal
-		var color: Color = Styles.TOKEN_COLORS.get(
-			str(card.get("bonus_color", "red")), Styles.COLOR_ACCENT
-		)
-		button.add_theme_stylebox_override(
-			"normal",
-			Styles.button_box(Styles.COLOR_PANEL_2.lerp(color, 0.18), color.darkened(0.25))
-		)
-		button.add_theme_stylebox_override(
-			"hover",
-			Styles.button_box(Styles.COLOR_PANEL_2.lerp(color, 0.32), color)
-		)
-		button.pressed.connect(_on_reserved_pressed.bind(index))
-		reserved_row.add_child(button)
+		if card_v is Dictionary:
+			reserved_row.add_child(_reserved_tile(index, card_v))
+
+
+## 保留牌卡片：减免、费用、进化门槛直接写在卡面上，卡片内按钮提交捕捉。
+func _reserved_tile(index: int, card: Dictionary) -> PanelContainer:
+	var legal := _is_legal(_capture_reserved(index)) and _can_interact()
+	var bonus_key := str(card.get("bonus_color", "red"))
+	var accent: Color = Styles.TOKEN_COLORS.get(bonus_key, Styles.COLOR_ACCENT)
+	var panel := Widgets.panel(Styles.tile_box(
+		Styles.COLOR_PANEL_2.lerp(accent, 0.14), accent.darkened(0.25), 8, 7, 5
+	))
+	panel.tooltip_text = _card_tooltip(card)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	panel.add_child(vbox)
+
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 6)
+	vbox.add_child(head)
+	head.add_child(Widgets.dot(accent))
+	head.add_child(Widgets.label(str(card.get("name_zh", "?")), 12, Styles.COLOR_TEXT))
+	head.add_child(Widgets.label("%d分" % int(card.get("points", 0)), 10, Styles.COLOR_GOLD))
+	head.add_child(Widgets.spacer())
+	var capture := Button.new()
+	capture.text = "捕捉"
+	capture.custom_minimum_size = Vector2(64, 26)
+	capture.disabled = not legal
+	Styles.style_button(capture)
+	capture.add_theme_font_size_override("font_size", 11)
+	capture.tooltip_text = (
+		"点击直接捕捉这张保留牌" if legal else _capture_block_reason(card)
+	)
+	capture.pressed.connect(_on_reserved_pressed.bind(index))
+	head.add_child(capture)
+
+	vbox.add_child(Widgets.label(
+		"减免 %s ｜ 费用 %s" % [Widgets.bonus_text(card), Widgets.cost_text(card)],
+		10,
+		Styles.COLOR_MUTED
+	))
+	var next := Widgets.next_evolution_name(card)
+	if not next.is_empty():
+		vbox.add_child(Widgets.label(
+			"进化 → %s（需 %s）" % [next, Widgets.evolution_requirement_text(card)],
+			10,
+			Styles.COLOR_TEXT
+		))
+	return panel
 
 
 func _render_supply() -> void:
@@ -973,21 +1088,76 @@ func _bonus_summary(bonuses: Dictionary) -> String:
 	return " ".join(parts) if not parts.is_empty() else "无"
 
 
-func _captured_summary(captured: Array) -> String:
-	var parts: Array[String] = []
-	var sorted := captured.duplicate()
+## 按胜利分从高到低排序；不修改传入数组。
+func _sorted_by_points(cards: Array) -> Array:
+	var sorted := cards.duplicate()
 	sorted.sort_custom(
 		func(a, b): return int(a.get("points", 0)) > int(b.get("points", 0))
 	)
-	for index in mini(2, sorted.size()):
-		if sorted[index] is Dictionary:
-			parts.append("%s %d分" % [
-				str(sorted[index].get("name_zh", "?")),
-				int(sorted[index].get("points", 0)),
-			])
-	if parts.is_empty():
-		return "尚无宝可梦"
-	return "最强：" + " · ".join(parts)
+	return sorted
+
+
+func _score_gap_text(points: int) -> String:
+	if points >= WIN_POINTS:
+		return "已达 %d 分结算线" % WIN_POINTS
+	return "距 %d 分还差 %d" % [WIN_POINTS, WIN_POINTS - points]
+
+
+func _me_bonuses() -> Dictionary:
+	var raw: Variant = _me_player().get("bonuses", {})
+	if raw is Dictionary:
+		return raw
+	return {}
+
+
+## 当前减免距离进化门槛的进度，例如 `蓝 2/3`；没有门槛时返回空串。
+func _evolution_progress_text(card: Dictionary, bonuses: Dictionary) -> String:
+	var requirement: Variant = card.get("evolution_requirement")
+	if not (requirement is Dictionary):
+		return ""
+	var color := str((requirement as Dictionary).get("color", ""))
+	var needed := int((requirement as Dictionary).get("count", 0))
+	if needed <= 0:
+		return ""
+	return "%s %d/%d" % [
+		Styles.COLOR_LABELS.get(color, color),
+		int(bonuses.get(color, 0)),
+		needed,
+	]
+
+
+## 界面提示：减免够了、且下一阶段牌在场上或自己的保留牌里。
+func _evolution_ready(card: Dictionary) -> bool:
+	var requirement: Variant = card.get("evolution_requirement")
+	if not (requirement is Dictionary):
+		return false
+	var color := str((requirement as Dictionary).get("color", ""))
+	var needed := int((requirement as Dictionary).get("count", 0))
+	if needed <= 0 or int(_me_bonuses().get(color, 0)) < needed:
+		return false
+	return not _evolution_target_source(Widgets.next_evolution_name(card)).is_empty()
+
+
+## 下一阶段牌的可进化来源：`场上 2阶` / `保留牌`；不在视野内返回空串。
+func _evolution_target_source(target_name: String) -> String:
+	if target_name.is_empty():
+		return ""
+	var board: Variant = _view.get("board", {})
+	if board is Dictionary:
+		for category in BOARD_CATEGORIES:
+			var slots: Variant = (board as Dictionary).get(category, [])
+			if not (slots is Array):
+				continue
+			for card_v in slots:
+				if card_v is Dictionary and str(card_v.get("name_zh", "")) == target_name:
+					return "场上 %s" % BOARD_LABELS.get(category, category)
+	var reserved: Variant = _me_player().get("reserved")
+	if reserved is Array:
+		for card_v in reserved:
+			if card_v is Dictionary and str(card_v.get("name_zh", "")) == target_name:
+				return "保留牌"
+	return ""
+
 # ---------------------------------------------------------------------------
 # 选择与主要行动
 # ---------------------------------------------------------------------------
@@ -1695,9 +1865,11 @@ func _player_points(view: Dictionary, player_id: int) -> int:
 
 func _player_tooltip(player: Dictionary) -> String:
 	var lines: Array[String] = []
-	lines.append("%s · %d 分" % [
+	var points := int(player.get("points", 0))
+	lines.append("%s · %d 分 · %s" % [
 		str(player.get("name", "?")),
-		int(player.get("points", 0)),
+		points,
+		_score_gap_text(points),
 	])
 	var tokens: Dictionary = player.get("tokens", {})
 	var token_parts: Array[String] = []
@@ -1708,66 +1880,102 @@ func _player_tooltip(player: Dictionary) -> String:
 	if token_parts.is_empty():
 		token_parts.append("无")
 	lines.append("精灵球：" + " ".join(token_parts))
+	lines.append("减免：" + _bonus_summary(player.get("bonuses", {})))
 
-	var bonuses: Dictionary = player.get("bonuses", {})
-	var bonus_parts: Array[String] = []
-	for key in COLOR_KEYS:
-		var count := int(bonuses.get(key, 0))
-		if count > 0:
-			bonus_parts.append("%s%d" % [Styles.COLOR_LABELS[key], count])
-	lines.append("减免：" + (" ".join(bonus_parts) if not bonus_parts.is_empty() else "无"))
+	var bonuses: Dictionary = {}
+	var bonuses_v: Variant = player.get("bonuses", {})
+	if bonuses_v is Dictionary:
+		bonuses = bonuses_v
 
-	var captured_parts: Array[String] = []
-	var captured: Variant = player.get("captured")
-	if captured is Array:
-		for card_v in captured:
+	var captured: Array = []
+	var captured_v: Variant = player.get("captured")
+	if captured_v is Array:
+		captured = captured_v
+	lines.append("捕捉 %d 张：" % captured.size())
+	if captured.is_empty():
+		lines.append("· 无")
+	else:
+		for card_v in _sorted_by_points(captured):
 			if card_v is Dictionary:
-				captured_parts.append("%s(%d)" % [
-					str(card_v.get("name_zh", "?")),
-					int(card_v.get("points", 0)),
-				])
-	lines.append("捕捉：%s" % (
-		"、".join(captured_parts) if not captured_parts.is_empty() else "无"
-	))
+				lines.append_array(Widgets.detail_lines(card_v, bonuses))
 
+	var reserved: Array = []
+	var reserved_v: Variant = player.get("reserved")
+	if reserved_v is Array:
+		reserved = reserved_v
 	var reserved_count := int(player.get("reserved_count", 0))
-	var reserved_parts: Array[String] = []
-	var reserved: Variant = player.get("reserved")
-	if reserved is Array:
-		for card_v in reserved:
-			if card_v is Dictionary:
-				reserved_parts.append(str(card_v.get("name_zh", "?")))
-	var hidden := maxi(0, reserved_count - reserved_parts.size())
-	lines.append("保留：%s" % (
-		"、".join(reserved_parts) + ("、%d 张未公开" % hidden if hidden > 0 else "")
-		if not reserved_parts.is_empty()
-		else ("%d 张未公开" % hidden if hidden > 0 else "无")
-	))
+	var hidden := maxi(0, reserved_count - reserved.size())
+	lines.append("保留 %d 张：" % reserved_count)
+	if reserved.is_empty():
+		lines.append("· 无" if hidden == 0 else "· 无可见牌面")
+	for card_v in reserved:
+		if card_v is Dictionary:
+			lines.append_array(Widgets.detail_lines(card_v, bonuses))
+	if hidden > 0:
+		lines.append("· %d 张从牌堆顶保留，牌面未公开" % hidden)
 	return "\n".join(lines)
 
 
-func _card_tooltip(card: Dictionary) -> String:
+## 按当前减免与持有精灵球估算这张牌的实际支付；大师球补差额。
+func _payment_text(card: Dictionary) -> String:
+	var me := _me_player()
+	var tokens: Dictionary = me.get("tokens", {})
+	var bonuses := _me_bonuses()
+	var cost_raw: Variant = card.get("cost", {})
+	var cost: Dictionary = {}
+	if cost_raw is Dictionary:
+		cost = cost_raw
+	var parts: Array[String] = []
+	var master := int(cost.get("master", 0))
+	for key in COLOR_KEYS:
+		var due := maxi(0, int(cost.get(key, 0)) - int(bonuses.get(key, 0)))
+		var paid := mini(due, int(tokens.get(key, 0)))
+		if paid > 0:
+			parts.append("%s%d" % [Styles.COLOR_LABELS.get(key, key), paid])
+		master += due - paid
+	if master > 0:
+		parts.append("大师%d" % master)
+	return " ".join(parts) if not parts.is_empty() else "免费"
+
+
+## 卡牌完整说明。owner_bonuses 传 null 表示按「我」的减免算进度；
+## check_target 为 true 时按「我」的视角补出实付与下一阶段牌的位置。
+func _card_tooltip(
+	card: Dictionary, owner_bonuses: Variant = null, check_target: bool = true
+) -> String:
 	var lines: Array[String] = []
 	lines.append("%s · %d 分" % [
 		str(card.get("name_zh", "?")),
 		int(card.get("points", 0)),
 	])
-	var bonus_key := str(card.get("bonus_color", "red"))
-	lines.append("减免 %s +%d" % [
-		Styles.COLOR_LABELS.get(bonus_key, "?"),
-		int(card.get("bonus_count", 0)),
+	lines.append("减免 %s ｜ 费用 %s" % [
+		Widgets.bonus_text(card),
+		Widgets.cost_text(card),
 	])
-	var cost: Dictionary = {}
-	var cost_raw: Variant = card.get("cost", {})
-	if cost_raw is Dictionary:
-		cost = cost_raw
-	var parts: Array[String] = []
-	for key in Styles.COLOR_KEYS:
-		var count := int(cost.get(key, 0))
-		if count > 0:
-			parts.append("%s%d" % [Styles.COLOR_LABELS.get(key, "?"), count])
-	lines.append("费用：" + (" ".join(parts) if not parts.is_empty() else "免费"))
+	if check_target:
+		lines.append("按当前减免与精灵球实付：" + _payment_text(card))
+	var bonuses := _me_bonuses()
+	if owner_bonuses is Dictionary:
+		bonuses = owner_bonuses
+	var next := Widgets.next_evolution_name(card)
+	if not next.is_empty():
+		lines.append("进化 → %s（需 %s）" % [
+			next,
+			Widgets.evolution_requirement_text(card),
+		])
+		lines.append("减免进度：" + _evolution_progress_text(card, bonuses))
+		if check_target:
+			var source := _evolution_target_source(next)
+			lines.append("下一阶段：" + (
+				"%s · 可以进化" % source
+				if not source.is_empty()
+				else "场上 / 我的保留牌中暂未出现"
+			))
+	var chain := Widgets.chain_text(card)
+	if not chain.is_empty():
+		lines.append("进化链：" + chain)
 	return "\n".join(lines)
+
 # ---------------------------------------------------------------------------
 # 无头冒烟
 # ---------------------------------------------------------------------------
@@ -1808,6 +2016,18 @@ func _run_smoke() -> void:
 		var level1: Variant = board_view.board().get("level1")
 		if not (level1 is Array) or (level1 as Array).size() != 4:
 			failures.append("1 阶行应有 4 个槽位")
+	if not (get_node_or_null("Margin/Root/Body/Side") is ScrollContainer):
+		failures.append("侧栏应为可滚动容器")
+	var side := get_node("Margin/Root/Body/Side") as Control
+	var side_scroll := get_node("Margin/Root/Body/Side/SideScroll") as Control
+	var me_panel := get_node("Margin/Root/Body/Side/SideScroll/MePanel") as Control
+	var opponents_panel := get_node("Margin/Root/Body/Side/SideScroll/OpponentsPanel") as Control
+	if side.size.x < 360.0:
+		failures.append("侧栏宽度不足：%.0f" % side.size.x)
+	if me_panel.size.y <= 0.0 or opponents_panel.size.y <= 0.0:
+		failures.append("侧栏面板没有分到高度：%.0f / %.0f" % [
+			me_panel.size.y, opponents_panel.size.y,
+		])
 	if prompt_label.text.is_empty():
 		failures.append("行动提示为空")
 	if supply_view.size.y < 40.0:
@@ -1825,6 +2045,57 @@ func _run_smoke() -> void:
 	if str(_take_action().get("type", "")) != "take_two":
 		failures.append("同色 2 个应拼成 take_two")
 	_supply_pick.clear()
+
+	# 卡牌信息：进化链、效果 tooltip、对手全量列表。
+	var sample_card: Dictionary = {}
+	var level1_cards: Variant = board_view.board().get("level1", [])
+	if level1_cards is Array and not (level1_cards as Array).is_empty():
+		var first: Variant = (level1_cards as Array)[0]
+		if first is Dictionary:
+			sample_card = first
+	if sample_card.is_empty():
+		failures.append("1 阶行没有可用于校验的卡片")
+	else:
+		var chain := Widgets.chain_text(sample_card)
+		if chain.find("→") < 0:
+			failures.append("卡牌缺少进化链文本：%s" % chain)
+		if Widgets.next_evolution_name(sample_card).is_empty():
+			failures.append("1 阶牌应有下一阶段形态")
+		var tooltip := _card_tooltip(sample_card)
+		if tooltip.find("进化链") < 0 or tooltip.find("进化 →") < 0:
+			failures.append("卡牌 tooltip 缺少进化信息：%s" % tooltip)
+		var tile := _captured_tile(sample_card)
+		if tile.get_child_count() != 1 or tile.tooltip_text.is_empty():
+			failures.append("已捕捉卡片缺少进化链或 tooltip")
+		tile.free()
+
+		var card_name := str(sample_card.get("name_zh", "?"))
+		var points := int(sample_card.get("points", 0))
+		var fake_opponent := {
+			"id": 1,
+			"name": "BotX",
+			"points": 5,
+			"tokens": {},
+			"bonuses": {},
+			"captured": [sample_card, sample_card],
+			"reserved_count": 2,
+			"reserved": [sample_card],
+			"hidden_reserved_count": 1,
+			"evolution_count": 0,
+			"card_count": 2,
+			"turns_taken": 1,
+		}
+		var opponent_panel := _opponent_panel(fake_opponent, -1, false)
+		var captured_chip_text := "%s %d分" % [card_name, points]
+		if _smoke_count_text(opponent_panel, captured_chip_text) != 2:
+			failures.append("对手面板应列出全部 %d 张捕捉牌" % 2)
+		if _smoke_count_text(opponent_panel, "保留 " + captured_chip_text) != 1:
+			failures.append("对手面板应列出可见保留牌")
+		if _smoke_count_text(opponent_panel, "? ×1") != 1:
+			failures.append("对手面板应标出未公开保留牌数量")
+		if opponent_panel.tooltip_text.find("进化链") < 0:
+			failures.append("对手面板 tooltip 缺少进化链")
+		opponent_panel.free()
 
 	var take := _smoke_find_take()
 	if take.is_empty():
@@ -1849,6 +2120,8 @@ func _run_smoke() -> void:
 			failures.append("选中卡片后动作条未显示")
 		if capture_button.text.is_empty() or reserve_button.text.is_empty():
 			failures.append("动作条按钮文案为空")
+		if prompt_label.text.find("实付") < 0:
+			failures.append("选中卡片后应显示实付提示：%s" % prompt_label.text)
 		_clear_selection()
 
 	if not take.is_empty():
@@ -1930,6 +2203,66 @@ func _run_smoke() -> void:
 			if opponents_box.get_child_count() != 1:
 				failures.append("1v1 对手面板应为 1 个，实际 %d" % opponents_box.get_child_count())
 
+	# 合成一局中期视图：验证「我的」卡片区与对手全量列表的实际排版。
+	if not sample_card.is_empty():
+		var many: Array = [sample_card, sample_card, sample_card]
+		var synthetic := {
+			"view": {
+				"current_player": 0,
+				"phase": "main_action",
+				"turn_number": 9,
+				"supply": {
+					"red": 2, "blue": 2, "yellow": 2, "pink": 2, "black": 2, "master": 0
+				},
+				"board": board_view.board(),
+				"players": [
+					{
+						"id": 0,
+						"name": "你",
+						"tokens": {},
+						"points": 9,
+						"bonuses": {"black": 2},
+						"captured": many,
+						"reserved_count": 1,
+						"reserved": [sample_card],
+						"hidden_reserved_count": 0,
+						"evolution_count": 1,
+						"card_count": 3,
+						"turns_taken": 4,
+					},
+					{
+						"id": 1,
+						"name": "Bot1",
+						"tokens": {},
+						"points": 6,
+						"bonuses": {"blue": 1},
+						"captured": many,
+						"reserved_count": 2,
+						"reserved": [sample_card],
+						"hidden_reserved_count": 1,
+						"evolution_count": 0,
+						"card_count": 3,
+						"turns_taken": 4,
+					},
+				],
+				"legal_actions": [],
+			},
+			"log": [],
+		}
+		_apply_state(synthetic, true)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if me_cards.get_child_count() != 3:
+			failures.append("我的捕捉列表应显示全部 3 张，实际 %d" % me_cards.get_child_count())
+		if reserved_row.get_child_count() != 1:
+			failures.append("我的保留牌应显示 1 张，实际 %d" % reserved_row.get_child_count())
+		if opponents_box.get_child_count() != 1:
+			failures.append("合成视图应有 1 个对手面板，实际 %d" % opponents_box.get_child_count())
+		if me_stats.text.find("已捕捉 3 张") < 0:
+			failures.append("我的统计行缺少捕捉数量：%s" % me_stats.text)
+		if me_cards.get_child(0).tooltip_text.find("进化链") < 0:
+			failures.append("我的捕捉卡片缺少进化链 tooltip")
+
 	_open_confirm_modal("测试确认", "确认对话框", func(): pass, "")
 	if modal_cancel.text != "取消" or modal_confirm.text != "确认":
 		failures.append("确认对话框按钮文案异常")
@@ -1942,10 +2275,12 @@ func _run_smoke() -> void:
 		failures.append("默认字体缺少中文字形")
 
 	if failures.is_empty():
-		print("[battle-smoke] OK 对手=%d 棋盘=%s 供应=%s 记录=%d 字" % [
+		print("[battle-smoke] OK 对手=%d 棋盘=%s 供应=%s 侧栏=%s/%s 记录=%d 字" % [
 			opponents_box.get_child_count(),
 			str(board_view.size),
 			str(supply_view.size),
+			str(side.size),
+			str(side_scroll.size),
 			events_label.text.length(),
 		])
 		get_tree().quit(0)
@@ -1997,6 +2332,13 @@ func _smoke_first_actionable_slot() -> Vector2i:
 func _smoke_fail(message: String) -> void:
 	printerr("[battle-smoke] FAIL " + message)
 	get_tree().quit(1)
+
+
+func _smoke_count_text(root: Node, text: String) -> int:
+	var count := 1 if root is Label and (root as Label).text == text else 0
+	for child in root.get_children():
+		count += _smoke_count_text(child, text)
+	return count
 
 
 func _smoke_drain_steps() -> void:

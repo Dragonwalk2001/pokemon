@@ -270,6 +270,17 @@ impl fmt::Display for EvolutionRequirement {
     }
 }
 
+/// 进化链上的一步：物种名、所处阶段，以及通往下一形态的门槛。
+///
+/// 由 [`crate::Catalog`] 在解析 `data/cards.csv` 后按物种名补齐；同一物种的
+/// 全部变体共享同一条链。链尾（3 阶）的 `requirement` 为 `None`。
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvolutionStep {
+    pub name_zh: String,
+    pub category: Category,
+    pub requirement: Option<EvolutionRequirement>,
+}
+
 /// 卡牌定义，来自 `data/cards.csv`。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Card {
@@ -282,6 +293,11 @@ pub struct Card {
     pub cost: TokenCounts,
     pub evolves_to_zh: Option<String>,
     pub evolution_requirement: Option<EvolutionRequirement>,
+    /// 该卡所在物种的完整进化链（含自身）。稀有 / 传说 / 无进化关系时为空。
+    ///
+    /// 界面直接展示这段链，不需要自己按名字拼装。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evolution_line: Vec<EvolutionStep>,
 }
 
 impl Card {

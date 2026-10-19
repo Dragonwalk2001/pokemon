@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CatalogError;
-use crate::types::{Card, Category, Color, EvolutionRequirement, TokenCounts};
+use crate::types::{Card, Category, Color, EvolutionRequirement, EvolutionStep, TokenCounts};
 
 /// 编译期嵌入规则数据，运行时不依赖工作目录。
 pub const BUILTIN_CARDS_CSV: &str = include_str!(concat!(
@@ -131,6 +131,7 @@ impl Catalog {
                 ),
                 evolves_to_zh,
                 evolution_requirement,
+                evolution_line: Vec::new(),
             };
 
             if by_id.insert(card_id, cards.len()).is_some() {
@@ -142,6 +143,8 @@ impl Catalog {
         if cards.is_empty() {
             return Err(CatalogError::Empty);
         }
+
+        attach_evolution_lines(&mut cards);
 
         Ok(Self { cards, by_id })
     }
@@ -166,6 +169,67 @@ impl Catalog {
 
     pub fn is_empty(&self) -> bool {
         self.cards.is_empty()
+    }
+}
+
+/// 按物种名把 `evolves_to_zh` 串成完整进化链，写回每张卡。
+///
+/// 同名卡是同一物种的不同变体，链与门槛一致；链首到链尾最多 3 阶。
+/// 不在任何进化关系里的卡（稀有 / 传说 / 单形态）保持空链。
+fn attach_evolution_lines(cards: &mut [Card]) {
+    let mut species: HashMap<String, EvolutionStep> = HashMap::new();
+    let mut next: HashMap<String, String> = HashMap::new();
+    let mut previous: HashMap<String, String> = HashMap::new();
+    for card in cards.iter() {
+        species
+            .entry(card.name_zh.clone())
+            .or_insert_with(|| EvolutionStep {
+                name_zh: card.name_zh.clone(),
+                category: card.category,
+                requirement: card.evolution_requirement.clone(),
+            });
+        if let Some(target) = &card.evolves_to_zh {
+            next.entry(card.name_zh.clone())
+                .or_insert_with(|| target.clone());
+            previous
+                .entry(target.clone())
+                .or_insert_with(|| card.name_zh.clone());
+        }
+    }
+
+    let mut lines: HashMap<String, Vec<EvolutionStep>> = HashMap::new();
+    for name in species.keys() {
+        let mut root = name.clone();
+        let mut guard = 0;
+        while let Some(prev) = previous.get(&root) {
+            if *prev == root || guard > species.len() {
+                break;
+            }
+            root = prev.clone();
+            guard += 1;
+        }
+
+        let mut line = Vec::new();
+        let mut cursor = Some(root);
+        let mut guard = 0;
+        while let Some(current) = cursor {
+            if guard > species.len() {
+                break;
+            }
+            let Some(step) = species.get(&current) else {
+                break;
+            };
+            line.push(step.clone());
+            cursor = next.get(&current).cloned();
+            guard += 1;
+        }
+        if line.len() > 1 {
+            lines.insert(name.clone(), line);
+        }
+    }
+
+    for card in cards.iter_mut() {
+        card.evolution_line = lines.get(&card.name_zh).cloned().unwrap_or_default();
     }
 }
 
