@@ -1,4 +1,4 @@
-//! PvE：1 名人类 + 2–3 个 bot，终端交互。
+//! PvE：1 名人类 + 1–3 个 bot，终端交互。
 //!
 //! 人类始终以玩家 0 的视角查看，bot 的保留牌不会泄露。
 //! `--auto` 让启发式 bot 代替人类席位，走的是同一条循环，便于演示与自动化测试。
@@ -220,7 +220,7 @@ impl Config {
                         .get(index)
                         .ok_or("--bots 缺少数值")?
                         .parse()
-                        .map_err(|_| "--bots 必须是 2 或 3".to_string())?;
+                        .map_err(|_| "--bots 必须是 1–3".to_string())?;
                 }
                 "--bot" => {
                     index += 1;
@@ -249,8 +249,8 @@ impl Config {
             index += 1;
         }
 
-        if !(2..=3).contains(&bots) {
-            return Err(format!("bots 必须为 2 或 3，当前为 {bots}"));
+        if !(1..=3).contains(&bots) {
+            return Err(format!("bots 必须为 1–3，当前为 {bots}"));
         }
         let players = bots + 1;
         let default_stem = format!("pve-{seed}-{players}p");
@@ -268,5 +268,29 @@ impl Config {
                 crate::bot_cmd::default_tmp_file(&format!("{default_stem}.html"))
             }),
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bots_range_allows_one_to_three() {
+        for bots in 1..=3 {
+            let args = vec!["--bots".to_string(), bots.to_string()];
+            let config = Config::from_args(&args)
+                .expect("config should parse")
+                .expect("config should exist");
+            assert_eq!(config.bots, bots);
+        }
+
+        for bots in [0, 4] {
+            let args = vec!["--bots".to_string(), bots.to_string()];
+            assert!(
+                Config::from_args(&args).is_err(),
+                "{bots} bots should be rejected"
+            );
+        }
     }
 }

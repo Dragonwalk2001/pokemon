@@ -1898,6 +1898,23 @@ func _run_smoke() -> void:
 		failures.append("结算面板应有 3 个选项")
 	_close_modal()
 
+	var one_on_one: Dictionary = await _smoke_request(
+		HTTPClient.METHOD_POST,
+		"/api/game/new",
+		{"seed": 7, "bots": 1, "bot": "heuristic", "name": "你"}
+	)
+	if not bool(one_on_one.get("ok", false)):
+		failures.append("1v1 开局失败：%s" % str(one_on_one))
+	else:
+		var one_state: Variant = (one_on_one["data"] as Dictionary).get("state")
+		if not (one_state is Dictionary):
+			failures.append("1v1 开局响应缺少 state")
+		else:
+			_apply_state(one_state, true)
+			await get_tree().process_frame
+			if opponents_box.get_child_count() != 1:
+				failures.append("1v1 对手面板应为 1 个，实际 %d" % opponents_box.get_child_count())
+
 	_open_confirm_modal("测试确认", "确认对话框", func(): pass, "")
 	if modal_cancel.text != "取消" or modal_confirm.text != "确认":
 		failures.append("确认对话框按钮文案异常")

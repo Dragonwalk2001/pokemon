@@ -11,6 +11,7 @@ const Widgets := preload("res://scripts/ui/widgets.gd")
 const BATTLE_SCENE := "res://scenes/battle.tscn"
 const REPLAY_SCENE := "res://scenes/replay.tscn"
 const PLAYER_OPTIONS := [
+	{"id": 1, "label": "1 人 + 1 AI"},
 	{"id": 2, "label": "1 人 + 2 AI"},
 	{"id": 3, "label": "1 人 + 3 AI"},
 ]
@@ -342,9 +343,18 @@ func _run_smoke() -> void:
 	if modal_options.get_child_count() != 3:
 		failures.append("新对局设置应有三行参数，实际 %d" % modal_options.get_child_count())
 	var cfg := _collect_setup_config()
-	if int(cfg.get("bots", 0)) < 2 or int(cfg.get("bots", 0)) > 3:
+	if _setup_bots_option.item_count != PLAYER_OPTIONS.size():
+		failures.append("对手数量应有 %d 个选项，实际 %d" % [
+			PLAYER_OPTIONS.size(),
+			_setup_bots_option.item_count,
+		])
+	if int(cfg.get("bots", 0)) < 1 or int(cfg.get("bots", 0)) > 3:
 		failures.append("对手数量默认值异常：%s" % str(cfg.get("bots")))
-	_setup_bots_option.select(1)
+	_setup_bots_option.select(0)
+	var one_v_one := _collect_setup_config()
+	if int(one_v_one.get("bots", 0)) != 1:
+		failures.append("1v1 选项应得到 1 个对手，实际 %s" % str(one_v_one.get("bots")))
+	_setup_bots_option.select(2)
 	_setup_seed_spin.value = 321
 	var changed := _collect_setup_config()
 	if int(changed.get("bots", 0)) != 3 or int(changed.get("seed", 0)) != 321:

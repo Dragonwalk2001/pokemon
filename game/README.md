@@ -103,14 +103,14 @@ game/
 
 ## 和 AI 对战
 
-`scenes/battle.tscn` 连接 `splendor-pokemon serve`（默认 `http://127.0.0.1:43110`），你是玩家 0，对手为 2–3 个 bot。
+`scenes/battle.tscn` 连接 `splendor-pokemon serve`（默认 `http://127.0.0.1:43110`），你是玩家 0，对手为 1–3 个 bot。
 规则、AI、回放记录和私有信息过滤都在 Rust 后端完成。
 
 启动：
 
 | 方式 | 操作 |
 |---|---|
-| 菜单 | 打开主场景，点「新对局」设置对手数量 / 强度 / 种子后开始 |
+| 菜单 | 打开主场景，点「新对局」设置对手数量（1 / 2 / 3） / 强度 / 种子后开始 |
 | 直接 | `--path game res://scenes/battle.tscn`，使用 `AppState` 默认设置（2 个 AI、minimax、种子 42） |
 | 服务 | 在 `backend/` 运行 `cargo run -p splendor-pokemon-cli -- serve`；无服务时界面会自动启动可执行文件，缺失时退回 `cargo run`（首次编译较慢） |
 

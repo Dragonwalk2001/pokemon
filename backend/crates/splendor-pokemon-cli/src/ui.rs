@@ -10,9 +10,9 @@ pub(crate) fn print_usage() {
 用法:
   splendor-pokemon [--players 2|3|4] [--names 名字1,名字2,...] [--seed N]
       本地热座对局（默认 2 人，seed 42）
-  splendor-pokemon pve [--bots 2|3] [--bot heuristic|minimax|heuristic-v1|random] [--name 名字] [--seed N]
+  splendor-pokemon pve [--bots 1|2|3] [--bot heuristic|minimax|heuristic-v1|random] [--name 名字] [--seed N]
                        [--replay out.json] [--html out.html] [--auto]
-      1 人 + 2–3 个 bot；--auto 让人类席位由启发式 bot 代打（演示 / 测试）
+      1 人 + 1–3 个 bot；--auto 让人类席位由启发式 bot 代打（演示 / 测试）
   splendor-pokemon bot-vs-bot [--players 2|3|4] [--bot heuristic|minimax|heuristic-v1|random] [--seed N]
                               [--replay out.json] [--html out.html]
       全部由 bot 对局，默认记录到 tmp/bot-<seed>-<n>p.json / .html
@@ -20,7 +20,7 @@ pub(crate) fn print_usage() {
                          [--seeds N --seed-start M | --ledger path]
       官方回测：10 个固定种子 + 10 个增量种子 = 40 局；调试模式不消耗游标
   splendor-pokemon serve [--port 43110] [--idle-timeout 秒] [--seed N]
-                         [--bots 2|3] [--bot minimax|heuristic|heuristic-v1|random] [--name 名字]
+                         [--bots 1|2|3] [--bot minimax|heuristic|heuristic-v1|random] [--name 名字]
       本地 JSON HTTP 服务，供 Godot「和 AI 对战」界面调用（只监听 127.0.0.1）
   splendor-pokemon replay <replay.json> [--html out.html]
       把回放 JSON 渲染为自包含 HTML"

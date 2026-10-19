@@ -7,7 +7,7 @@
 | 模式 | 操作方式 | 是否记录回放 |
 |---|---|---|
 | 本地热座 | 终端里多人轮流输入 | 否 |
-| PvE（1 人 + 2–3 bot） | 终端交互，bot 自动行动 | 是，终局后写文件 |
+| PvE（1 人 + 1–3 bot） | 终端交互，bot 自动行动 | 是，终局后写文件 |
 | bot-vs-bot | 终端自动跑完 | 是，默认写文件 |
 
 Godot 里另有：
@@ -16,7 +16,7 @@ Godot 里另有：
 |---|---|---|
 | 标题菜单 | 启动后的主场景：继续 / 新对局 / 观看回放 / 设置 | 不适用 |
 | 回放 | 读取 `tmp/*.json` 逐帧查看 | 不适用 |
-| 和 AI 对战 | 图形界面操作，1 人 + 2–3 bot；后端 `serve` 执行规则与 AI | 是，终局自动写 `tmp/pve-<seed>-<n>p.*` |
+| 和 AI 对战 | 图形界面操作，1 人 + 1–3 bot；后端 `serve` 执行规则与 AI | 是，终局自动写 `tmp/pve-<seed>-<n>p.*` |
 
 ## 环境
 
@@ -72,19 +72,20 @@ cargo run -p splendor-pokemon-cli -- --players 3 --seed 42
 cargo run -p splendor-pokemon-cli -- --names 小明,小红,小刚
 ```
 
-### PvE：1 人 vs 2–3 个 bot
+### PvE：1 人 vs 1–3 个 bot
 
 ```bash
-cargo run -p splendor-pokemon-cli -- pve --bots 2 --seed 42
+cargo run -p splendor-pokemon-cli -- pve --bots 1 --seed 42
 ```
 
-- 你是玩家 0，其余是 `Bot1`、`Bot2`；`--bots 3` 则为 1 人 vs 3 bot。
+- `--bots` 可取 1–3：`1` 为 1v1，`2`（默认）为 1 人 vs 2 bot，`3` 为 1 人 vs 3 bot。
+- 你是玩家 0，其余是 `Bot1`…`Bot3`。
 - bot 回合自动执行，轮到你时出现 `你>` 提示符。
 - `--bot random` 可把 bot 换成随机策略（默认 `minimax` 搜索策略）。
 - `--bot heuristic` 使用旧的启发式策略。
 - `--bot minimax` 使用极小化极大搜索策略（捕捉阶段展开搜索树）。
 - `--bot heuristic-v1` 是冻结的旧版启发式，仅用于回测对照。
-- 终局后自动写入仓库根目录：`tmp/pve-42-3p.json` 和 `.html`（`3p` = 1 人 + 2 bot）。
+- 终局后自动写入仓库根目录：`tmp/pve-42-2p.json` 和 `.html`（`2p` = 1 人 + 1 bot）。
 
 演示或测试时，可以让启发式 bot 代替你的席位自动打完：
 
@@ -223,9 +224,9 @@ HTML 是单个自包含文件，没有服务器、CDN 或联网请求。支持�
 
 ## 6. Godot 和 AI 对战
 
-`game/scenes/battle.tscn` 是交互式 PvE：你是玩家 0，对手是 2–3 个 bot。规则判定、AI 决策与回放记录全部在 Rust 后端，Godot 只发送动作并渲染引擎返回的 `GameView`，不复制规则。服务只监听 `127.0.0.1`，没有联网或远程 PvP。
+`game/scenes/battle.tscn` 是交互式 PvE：你是玩家 0，对手是 1–3 个 bot。规则判定、AI 决策与回放记录全部在 Rust 后端，Godot 只发送动作并渲染引擎返回的 `GameView`，不复制规则。服务只监听 `127.0.0.1`，没有联网或远程 PvP。
 
-从标题菜单进入：「新对局」设置对手数量（2 / 3）、对手强度与随机种子；「继续对局」在存在进行中对局时可用，通过 `GET /api/game/state` 恢复。也可以直接打开对战场景，跳过菜单并使用默认设置（2 个 AI、极小化极大、种子 42）：
+从标题菜单进入：「新对局」设置对手数量（1 / 2 / 3）、对手强度与随机种子；「继续对局」在存在进行中对局时可用，通过 `GET /api/game/state` 恢复。也可以直接打开对战场景，跳过菜单并使用默认设置（2 个 AI、极小化极大、种子 42）：
 
 ```bash
 # 方式 A：先启动本地服务，再打开对战场景

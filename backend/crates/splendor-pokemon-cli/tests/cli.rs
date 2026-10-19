@@ -191,6 +191,41 @@ fn pve_auto_finishes_and_records_replay() {
 }
 
 #[test]
+fn pve_one_on_one_auto_finishes() {
+    let dir = tmp_dir();
+    let stem = format!("cli-pve-1v1-{}", std::process::id());
+    let json = dir.join(format!("{stem}.json"));
+    let html = dir.join(format!("{stem}.html"));
+
+    let output = run(&[
+        "pve",
+        "--bots",
+        "1",
+        "--auto",
+        "--bot",
+        "heuristic",
+        "--seed",
+        "12",
+        "--replay",
+        json.to_str().unwrap(),
+        "--html",
+        html.to_str().unwrap(),
+    ]);
+    assert_success(&output);
+
+    let replay = load_replay(&json);
+    assert_eq!(replay.players.len(), 2);
+    assert_eq!(replay.controllers, vec!["human", "heuristic"]);
+    let result = replay.result.as_ref().expect("1v1 pve game must finish");
+    assert_eq!(result.points.len(), 2);
+    assert_eq!(replay.frames.last().unwrap().view.phase, Phase::GameOver);
+    assert_self_contained_html(&html);
+
+    let _ = fs::remove_file(json);
+    let _ = fs::remove_file(html);
+}
+
+#[test]
 fn serve_accepts_http_health_and_new_game() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_splendor-pokemon"))
         .current_dir(workspace_root())

@@ -21,7 +21,7 @@ backend/
     │   └── tests/                   # 卡牌数据、公开 API、bot 测试
     └── splendor-pokemon-cli/        # 对局 CLI
         ├── src/main.rs              # 子命令分发与热座对局
-        ├── src/pve.rs               # 1 人 + 2–3 bot
+        ├── src/pve.rs               # 1 人 + 1–3 bot
         ├── src/serve.rs             # 127.0.0.1 JSON HTTP 服务（Godot 对战）
         ├── src/bot_cmd.rs           # bot-vs-bot / replay 子命令
         ├── src/arena.rs              # 固定 20 种子 × 先后手互换的 40 局回测
@@ -46,7 +46,10 @@ cargo run -p splendor-pokemon-cli -- --players 3 --seed 42
 # 指定名字（人数由名字数量决定）
 cargo run -p splendor-pokemon-cli -- --names Alice,Bob,Carol
 
-# PvE：1 人 + 2 个启发式 bot，终端交互
+# PvE：1 人 + 1 个启发式 bot（1v1），终端交互
+cargo run -p splendor-pokemon-cli -- pve --bots 1 --bot heuristic --seed 42
+
+# PvE：1 人 + 2 个 bot，终端交互
 cargo run -p splendor-pokemon-cli -- pve --bots 2 --seed 42
 
 # PvE 演示 / 测试：人类席位由启发式 bot 代打，可离开终端跑完

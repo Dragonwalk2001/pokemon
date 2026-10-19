@@ -83,8 +83,8 @@ struct Session {
 
 impl Session {
     fn new(seed: u64, bots_count: usize, bot_kind: BotKind, name: String) -> Result<Self, String> {
-        if !(2..=3).contains(&bots_count) {
-            return Err(format!("bots 必须为 2 或 3，当前为 {bots_count}"));
+        if !(1..=3).contains(&bots_count) {
+            return Err(format!("bots 必须为 1–3，当前为 {bots_count}"));
         }
         let players = bots_count + 1;
         let names: Vec<String> = std::iter::once(name)
@@ -542,7 +542,7 @@ impl Config {
                         .get(index)
                         .ok_or("--bots 缺少数值")?
                         .parse()
-                        .map_err(|_| "--bots 必须是 2 或 3".to_string())?;
+                        .map_err(|_| "--bots 必须是 1–3".to_string())?;
                 }
                 "--bot" => {
                     index += 1;
@@ -562,8 +562,8 @@ impl Config {
             index += 1;
         }
 
-        if !(2..=3).contains(&bots) {
-            return Err(format!("bots 必须为 2 或 3，当前为 {bots}"));
+        if !(1..=3).contains(&bots) {
+            return Err(format!("bots 必须为 1–3，当前为 {bots}"));
         }
         Ok(Some(Self {
             port,
@@ -601,6 +601,48 @@ mod tests {
         assert!(session.human_turn());
         assert!(!session.stalemate);
         assert_eq!(session.controllers, vec!["human", "heuristic", "heuristic"]);
+    }
+
+    #[test]
+    fn one_bot_session_is_a_two_player_game() {
+        let mut session =
+            Session::new(29, 1, BotKind::Heuristic, "你".to_string()).expect("session");
+        assert_eq!(session.controllers, vec!["human", "heuristic"]);
+        assert_eq!(session.game.players().len(), 2);
+
+        let action = first_take_three(&session);
+        session.apply_human_action(action).expect("apply");
+        let steps = session
+            .apply_human_action(Action::EndTurn)
+            .expect("end turn");
+        assert_eq!(steps.len(), 3, "结束回合后 1 个 bot 应完成主行动与结束回合");
+        assert_eq!(session.game.current_player(), HUMAN);
+        assert!(session.human_turn());
+    }
+
+    #[test]
+    fn one_bot_session_plays_a_full_game() {
+        let mut session =
+            Session::new(31, 1, BotKind::Heuristic, "你".to_string()).expect("session");
+        let mut human = make_bot(BotKind::Heuristic, HUMAN, 31);
+        for _ in 0..5_000 {
+            if session.game.is_over() || session.stalemate {
+                break;
+            }
+            let view = session.game.view_for(HUMAN);
+            let Some(action) = human.choose_action(&view) else {
+                break;
+            };
+            session.apply_human_action(action).expect("human action");
+        }
+        assert!(
+            session.game.is_over() || session.stalemate,
+            "1v1 对局应在 5000 个动作内结束（回合 {}）",
+            session.game.turn_number()
+        );
+        let replay = session.recorder.to_replay(&session.game, session.stalemate);
+        assert_eq!(replay.players.len(), 2);
+        assert_eq!(replay.controllers, vec!["human", "heuristic"]);
     }
 
     #[test]
