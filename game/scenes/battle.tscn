@@ -200,12 +200,10 @@ theme_override_constants/separation = 5
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="MeTokens" type="Label" parent="Margin/Root/Body/Side/MePanel/VBox"]
+[node name="MeTokens" type="HFlowContainer" parent="Margin/Root/Body/Side/MePanel/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.576471, 0.627451, 0.709804, 1)
-theme_override_font_sizes/font_size = 12
-text = "精灵球：—"
-autowrap_mode = 2
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
 
 [node name="MeCards" type="HFlowContainer" parent="Margin/Root/Body/Side/MePanel/VBox"]
 layout_mode = 2

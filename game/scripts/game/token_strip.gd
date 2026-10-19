@@ -80,41 +80,49 @@ func _draw_pile(font: Font, key: String, rect: Rect2) -> void:
 		border = color.lightened(0.15)
 	draw_style_box(Styles.tile_box(bg, border, 10, 0, 0), rect)
 
-	var dot_color := color if count > 0 else color.darkened(0.55)
-	draw_circle(Vector2(rect.position.x + 14.0, rect.position.y + 16.0), 7.0, dot_color)
-
-	var label := str(Styles.COLOR_LABELS.get(key, key))
-	var label_color := Styles.COLOR_MUTED if count > 0 else Color(0.42, 0.47, 0.56)
+	# 球本体：彩色圆球 + 球内数字，与卡面费用同一形式。
+	var ball_radius := clampf(minf(rect.size.x * 0.30, (rect.size.y - 22.0) * 0.5), 9.0, 17.0)
+	var ball_center := Vector2(
+		rect.position.x + rect.size.x * 0.5,
+		rect.position.y + 4.0 + ball_radius
+	)
+	var ball_color := color if count > 0 else color.darkened(0.55)
+	draw_circle(ball_center, ball_radius, ball_color)
+	draw_arc(ball_center, ball_radius, 0.0, TAU, 24, Color(1, 1, 1, 0.35), 1.0, true)
+	var number_size := int(clampf(ball_radius * 0.9, 10.0, 13.0))
+	var number := str(count)
+	var number_w := font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size).x
 	draw_string(
 		font,
-		Vector2(rect.position.x + 26.0, rect.position.y + 21.0),
+		Vector2(ball_center.x - number_w * 0.5, ball_center.y + number_size * 0.36),
+		number,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		number_size,
+		Styles.ball_ink(key) if count > 0 else Color(0.42, 0.47, 0.56)
+	)
+
+	# 颜色名放球下方，已选数量追加在后面，数字本身写在球里。
+	var label := str(Styles.COLOR_LABELS.get(key, key))
+	if chosen > 0:
+		label += " +%d" % chosen
+	var label_size := 11
+	var label_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, label_size).x
+	var label_color := Styles.COLOR_GOLD if chosen > 0 else (
+		Styles.COLOR_MUTED if count > 0 else Color(0.42, 0.47, 0.56)
+	)
+	draw_string(
+		font,
+		Vector2(
+			rect.position.x + (rect.size.x - label_w) * 0.5,
+			rect.position.y + rect.size.y - 7.0
+		),
 		label,
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
-		12,
+		label_size,
 		label_color
 	)
-	draw_string(
-		font,
-		Vector2(rect.position.x + 6.0, rect.position.y + rect.size.y - 9.0),
-		str(count),
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		15,
-		Styles.COLOR_TEXT if count > 0 else Color(0.42, 0.47, 0.56)
-	)
-	if chosen > 0:
-		var badge := "+%d" % chosen
-		var badge_w := font.get_string_size(badge, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-		draw_string(
-			font,
-			Vector2(rect.position.x + rect.size.x - badge_w - 6.0, rect.position.y + rect.size.y - 9.0),
-			badge,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			11,
-			Styles.COLOR_GOLD
-		)
 	# 不可点的球堆整体压暗，保持数字仍可读。
 	if _blocked.has(key):
 		draw_rect(rect, Color(0.04, 0.05, 0.08, 0.42))

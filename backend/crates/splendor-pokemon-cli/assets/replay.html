@@ -134,27 +134,19 @@
   .ball.pink { background: var(--pink); color: #2c0f21; }
   .ball.black { background: var(--black); color: #14161c; }
   .ball.master { background: var(--master); color: #1a1230; }
+  .ball.zero { opacity: .4; }
   .card-cost .free { font-size: 10px; color: var(--muted); padding-left: 2px; }
   .points {
-    background: #2d4a9e; color: #fff; border-radius: 999px; padding: 0 8px;
+    background: var(--gold); color: #1a1a22; border-radius: 4px; padding: 0 7px;
     font-size: 12px; font-weight: 800; line-height: 20px; white-space: nowrap;
   }
   .points.zero { background: #2a3140; color: var(--muted); }
   .line { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
-  .pill {
-    display: inline-flex; align-items: center; gap: 4px; border-radius: 999px;
-    padding: 1px 7px; background: #232b3a; color: var(--text); font-size: 11px;
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
-  .c-red { background: var(--red); } .c-blue { background: var(--blue); }
-  .c-yellow { background: var(--yellow); } .c-pink { background: var(--pink); }
-  .c-black { background: var(--black); } .c-master { background: var(--master); }
   .token-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .token {
     background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
     padding: 8px 9px; display: flex; align-items: center; gap: 7px;
   }
-  .token .count { margin-left: auto; font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
   .token.zero { opacity: .4; }
   .action-box { display: flex; flex-direction: column; gap: 9px; }
   .action-main { font-size: 16px; font-weight: 700; color: var(--gold); }
@@ -310,10 +302,9 @@
     for (const color of COLORS) {
       const count = tokens[color.key] || 0;
       if (!includeZero && count === 0) continue;
-      const pill = node("span", "pill");
-      pill.append(node("span", `dot c-${color.key}`));
-      pill.append(document.createTextNode(`${color.label} ${count}`));
-      wrap.append(pill);
+      const ball = node("span", count > 0 ? `ball ${color.key}` : `ball ${color.key} zero`, String(count));
+      ball.title = `${color.label} ${count}`;
+      wrap.append(ball);
     }
     if (!wrap.childNodes.length) wrap.append(node("span", "chip", "无"));
     return wrap;
@@ -355,8 +346,9 @@
       const evo = node("div", "card-evo");
       evo.append(node("span", "evo-target", `→ ${card.evolves_to_zh}`));
       const req = node("span", "evo-req");
-      req.append(document.createTextNode(String(requirement.count)));
-      req.append(node("span", `dot c-${requirement.color}`));
+      const reqBall = node("span", `ball ${requirement.color}`, String(requirement.count));
+      reqBall.title = `${colorLabel(requirement.color)}减免 ${requirement.count}`;
+      req.append(reqBall);
       evo.append(req);
       evo.title = `进化：需 ${requirement.count}${colorLabel(requirement.color)}减免`;
       bottom.append(evo);
@@ -372,9 +364,10 @@
 
   function supplyTile(color, count) {
     const tile = node("div", count > 0 ? "token" : "token zero");
-    tile.append(node("span", `dot c-${color.key}`));
+    const ball = node("span", count > 0 ? `ball ${color.key}` : `ball ${color.key} zero`, String(count));
+    ball.title = `${color.label} ${count}`;
+    tile.append(ball);
     tile.append(node("span", "", color.label));
-    tile.append(node("span", "count", String(count)));
     return tile;
   }
 
@@ -418,10 +411,9 @@
     for (const color of COLORS.slice(0, 5)) {
       const count = player.bonuses[color.key] || 0;
       if (count === 0) continue;
-      const pill = node("span", "pill");
-      pill.append(node("span", `dot c-${color.key}`));
-      pill.append(document.createTextNode(String(count)));
-      bonusWrap.append(pill);
+      const ball = node("span", `ball ${color.key}`, String(count));
+      ball.title = `${color.label}减免 ${count}`;
+      bonusWrap.append(ball);
     }
     if (bonusWrap.childNodes.length === 1) bonusWrap.append(node("span", "chip", "无"));
     element.append(bonusWrap);

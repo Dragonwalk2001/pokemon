@@ -208,25 +208,27 @@ func _draw_card(font: Font, box: Rect2, card: Dictionary, _accent: Color, compac
 		20.0, minf(glyph_limit, (inner_w - 8.0) / maxf(float(name.length()), 1.0))
 	))
 
-	# 分数徽章（右上角）。
+	# 分数徽章（右上角）：黄色方块，与精灵球区分。
 	var points := int(card.get("points", 0))
-	var badge_radius := 6.5 if compact else 9.0
-	var badge_center := Vector2(
-		box.position.x + box.size.x - pad - badge_radius,
-		box.position.y + pad + badge_radius
+	var badge_side := 13.0 if compact else 18.0
+	var badge_rect := Rect2(
+		Vector2(box.position.x + box.size.x - pad - badge_side, box.position.y + pad),
+		Vector2(badge_side, badge_side)
 	)
-	draw_circle(badge_center, badge_radius, Styles.COLOR_GOLD if points > 0 else Color("2a3140"))
+	draw_style_box(
+		Styles.score_box(Styles.COLOR_GOLD if points > 0 else Color("2a3140")),
+		badge_rect
+	)
 	var badge_font_size := 10 if compact else 11
-	var badge_text := str(points)
-	var badge_text_w := font.get_string_size(
-		badge_text, HORIZONTAL_ALIGNMENT_LEFT, -1, badge_font_size
-	).x
 	draw_string(
 		font,
-		Vector2(badge_center.x - badge_text_w * 0.5, badge_center.y + badge_font_size * 0.36),
-		badge_text,
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
+		Vector2(
+			badge_rect.position.x,
+			badge_rect.position.y + badge_rect.size.y * 0.5 + badge_font_size * 0.36
+		),
+		str(points),
+		HORIZONTAL_ALIGNMENT_CENTER,
+		badge_rect.size.x,
 		badge_font_size,
 		Color("1a1a22") if points > 0 else Styles.COLOR_MUTED
 	)
@@ -272,19 +274,7 @@ func _draw_card(font: Font, box: Rect2, card: Dictionary, _accent: Color, compac
 		if count <= 0:
 			continue
 		has_cost = true
-		var ball_color: Color = Styles.TOKEN_COLORS.get(key, Styles.COLOR_ACCENT)
-		draw_circle(Vector2(cursor, cost_center_y), ball_radius, ball_color)
-		var label := str(count)
-		var label_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size).x
-		draw_string(
-			font,
-			Vector2(cursor - label_w * 0.5, cost_center_y + number_size * 0.36),
-			label,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			number_size,
-			_ball_ink(key)
-		)
+		_draw_ball(font, Vector2(cursor, cost_center_y), ball_radius, key, count, number_size)
 		cursor += ball_radius * 2.0 + 3.0
 	if not has_cost:
 		draw_string(
@@ -305,39 +295,56 @@ func _draw_card(font: Font, box: Rect2, card: Dictionary, _accent: Color, compac
 	if evolves_to.is_empty() or not (requirement_raw is Dictionary):
 		return
 	var requirement: Dictionary = requirement_raw
-	var evo_text := "→ %s · %d%s" % [
-		evolves_to,
-		int(requirement.get("count", 0)),
-		Styles.COLOR_LABELS.get(str(requirement.get("color", "red")), "?"),
-	]
-	var evo_w := font.get_string_size(evo_text, HORIZONTAL_ALIGNMENT_LEFT, -1, small_size).x
+	var evo_color := str(requirement.get("color", "red"))
+	var evo_count := int(requirement.get("count", 0))
+	var evo_prefix := "→ %s · " % evolves_to
+	var evo_ball_radius := 6.0
+	var evo_text_w := font.get_string_size(
+		evo_prefix, HORIZONTAL_ALIGNMENT_LEFT, -1, small_size
+	).x
+	var evo_w := evo_text_w + evo_ball_radius * 2.0
 	var evo_x := box.position.x + box.size.x - pad - evo_w
 	if evo_x < cursor + 6.0:
 		return
 	draw_string(
 		font,
 		Vector2(evo_x, cost_center_y + small_size * 0.36),
-		evo_text,
+		evo_prefix,
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		small_size,
 		Color("d9c9ff")
 	)
+	_draw_ball(
+		font,
+		Vector2(evo_x + evo_text_w + evo_ball_radius, cost_center_y),
+		evo_ball_radius,
+		evo_color,
+		evo_count,
+		8
+	)
 
 
-## 费用球内数字：浅色球用深字，深色球用白字（与 HTML 卡面一致）。
-func _ball_ink(key: String) -> Color:
-	match key:
-		"yellow":
-			return Color("2a2408")
-		"pink":
-			return Color("2c0f21")
-		"black":
-			return Color("14161c")
-		"master":
-			return Color("1a1230")
-		_:
-			return Color.WHITE
+## 编号精灵球：彩色正圆 + 浅色描边，数字写在球内（与 HTML 卡面 .ball 一致）。
+func _draw_ball(
+	font: Font, center: Vector2, radius: float, key: String, count: int, font_size: int
+) -> void:
+	var ball_color: Color = Styles.TOKEN_COLORS.get(key, Styles.COLOR_ACCENT)
+	draw_circle(center, radius, ball_color)
+	draw_arc(center, radius, 0.0, TAU, 24, Color(1, 1, 1, 0.35), 1.0, true)
+	var label := str(count)
+	var label_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	draw_string(
+		font,
+		Vector2(center.x - label_w * 0.5, center.y + font_size * 0.36),
+		label,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Styles.ball_ink(key)
+	)
+
+
 func _draw_empty_slot(font: Font, box: Rect2, compact: bool) -> void:
 	draw_style_box(Styles.panel_box(Color("141a24"), Color("242c3a"), 10), box)
 	var font_size := 11 if compact else 12

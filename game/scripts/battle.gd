@@ -44,7 +44,7 @@ const RESERVE_LIMIT := 3
 @onready var supply_hint: Label = $Margin/Root/Body/Side/SupplyPanel/VBox/SupplyHint
 @onready var reserved_row: HFlowContainer = $Margin/Root/Body/Side/ReservedPanel/VBox/ReservedRow
 @onready var me_head: HBoxContainer = $Margin/Root/Body/Side/MePanel/VBox/MeHead
-@onready var me_tokens: Label = $Margin/Root/Body/Side/MePanel/VBox/MeTokens
+@onready var me_tokens: HFlowContainer = $Margin/Root/Body/Side/MePanel/VBox/MeTokens
 @onready var me_cards: HFlowContainer = $Margin/Root/Body/Side/MePanel/VBox/MeCards
 @onready var prompt_label: Label = $Margin/Root/ActionDock/VBox/PromptRow/PromptLabel
 @onready var basket_label: Label = $Margin/Root/ActionDock/VBox/PromptRow/BasketLabel
@@ -152,7 +152,6 @@ func _apply_styles() -> void:
 	events_label.add_theme_font_size_override("normal_font_size", 12)
 	events_label.add_theme_font_size_override("bold_font_size", 12)
 	supply_hint.add_theme_color_override("font_color", Styles.COLOR_MUTED)
-	me_tokens.add_theme_color_override("font_color", Styles.COLOR_MUTED)
 	prompt_label.add_theme_color_override("font_color", Styles.COLOR_TEXT)
 	basket_label.add_theme_color_override("font_color", Styles.COLOR_GOLD)
 	phase_badge.add_theme_color_override("font_color", Styles.COLOR_ACCENT)
@@ -793,7 +792,7 @@ func _opponent_panel(player: Dictionary, current_id: int, game_over: bool) -> Pa
 	head.add_child(Widgets.label("分", 11, Styles.COLOR_MUTED))
 
 	var tokens: Dictionary = player.get("tokens", {})
-	vbox.add_child(Widgets.label(_token_summary(tokens), 11, Styles.COLOR_MUTED))
+	vbox.add_child(_ball_row(tokens))
 
 	var stats := "减免 %s ｜ 捕捉 %d · 保留 %d/%d · 进化 %d" % [
 		_bonus_summary(player.get("bonuses", {})),
@@ -816,9 +815,10 @@ func _opponent_panel(player: Dictionary, current_id: int, game_over: bool) -> Pa
 func _render_me() -> void:
 	Widgets.clear(me_head)
 	Widgets.clear(me_cards)
+	Widgets.clear(me_tokens)
 	var players: Variant = _view.get("players")
 	if not (players is Array) or (players as Array).is_empty():
-		me_tokens.text = "精灵球：—"
+		me_tokens.add_child(Widgets.label("精灵球：—", 12, Styles.COLOR_MUTED))
 		return
 	var me: Dictionary = (players as Array)[0]
 	me_head.add_child(Widgets.label(str(me.get("name", "你")), 16, Styles.COLOR_TEXT))
@@ -829,10 +829,25 @@ func _render_me() -> void:
 
 	var tokens: Dictionary = me.get("tokens", {})
 	var bonuses: Dictionary = me.get("bonuses", {})
-	me_tokens.text = "精灵球：%s ｜ 减免：%s" % [
-		_token_summary(tokens),
-		_bonus_summary(bonuses),
-	]
+	var tokens_label := Widgets.label("精灵球", 11, Styles.COLOR_MUTED)
+	tokens_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	me_tokens.add_child(tokens_label)
+	for key in Styles.COLOR_KEYS:
+		var count := int(tokens.get(key, 0))
+		me_tokens.add_child(Widgets.ball(key, count, 20, count == 0))
+	var bonus_label := Widgets.label("减免", 11, Styles.COLOR_MUTED)
+	bonus_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	me_tokens.add_child(bonus_label)
+	var has_bonus := false
+	for key in Styles.COLOR_KEYS:
+		var count := int(bonuses.get(key, 0))
+		if count > 0:
+			me_tokens.add_child(Widgets.ball(key, count, 18))
+			has_bonus = true
+	if not has_bonus:
+		var none_label := Widgets.label("无", 11, Styles.COLOR_MUTED)
+		none_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		me_tokens.add_child(none_label)
 
 	var captured: Array = []
 	var captured_v: Variant = me.get("captured")
@@ -938,15 +953,15 @@ func _supply_hint_text() -> String:
 	return "已选 %d 个：可以再选不同颜色，或用底栏确认。" % total
 
 
-func _token_summary(tokens: Dictionary) -> String:
-	var parts: Array[String] = []
+## 编号精灵球行：颜色球 + 球内数量；数量为 0 时压暗占位。
+func _ball_row(tokens: Dictionary, diameter: int = 18) -> HFlowContainer:
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 3)
+	row.add_theme_constant_override("v_separation", 3)
 	for key in Styles.COLOR_KEYS:
 		var count := int(tokens.get(key, 0))
-		if count > 0:
-			parts.append("%s%d" % [Styles.COLOR_LABELS[key], count])
-	if parts.is_empty():
-		return "无"
-	return " ".join(parts)
+		row.add_child(Widgets.ball(key, count, diameter, count == 0))
+	return row
 
 
 func _bonus_summary(bonuses: Dictionary) -> String:

@@ -124,6 +124,49 @@ static func dot_box(color: Color) -> StyleBoxFlat:
 	return box
 
 
+## 编号精灵球：彩色正圆 + 浅色描边，数字写在球内。
+static func ball_box(color: Color, diameter: int = 20) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = color
+	box.border_color = Color(1, 1, 1, 0.35)
+	box.set_border_width_all(1)
+	box.set_corner_radius_all(int(diameter * 0.5))
+	box.content_margin_left = 0
+	box.content_margin_right = 0
+	box.content_margin_top = 0
+	box.content_margin_bottom = 0
+	return box
+
+
+## 球内数字：浅色球用深字，深色球用白字（与 HTML 卡面 .ball 一致）。
+static func ball_ink(key: String) -> Color:
+	match key:
+		"yellow":
+			return Color("2a2408")
+		"pink":
+			return Color("2c0f21")
+		"black":
+			return Color("14161c")
+		"master":
+			return Color("1a1230")
+		_:
+			return Color.WHITE
+
+
+## 分数方块：卡牌胜利分用方块，避免和精灵球混淆。
+static func score_box(bg: Color) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = bg
+	box.border_color = Color(0, 0, 0, 0)
+	box.set_border_width_all(0)
+	box.set_corner_radius_all(3)
+	box.content_margin_left = 0
+	box.content_margin_right = 0
+	box.content_margin_top = 0
+	box.content_margin_bottom = 0
+	return box
+
+
 ## 终局 / 僵局横幅。
 static func banner_box(accent: Color) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()

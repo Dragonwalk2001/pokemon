@@ -27,6 +27,25 @@ static func dot(color: Color) -> PanelContainer:
 	return node
 
 
+## 编号精灵球：与卡面费用一致的彩色圆球，数字写在球内；dim 表示数量为 0 的占位。
+static func ball(
+	key: String, count: int, diameter: int = 20, dim: bool = false
+) -> PanelContainer:
+	var node := panel(
+		Styles.ball_box(Styles.TOKEN_COLORS.get(key, Styles.COLOR_ACCENT), diameter)
+	)
+	node.custom_minimum_size = Vector2(diameter, diameter)
+	node.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if dim:
+		node.modulate = Color(1, 1, 1, 0.4)
+	var value := label(str(count), maxi(10, int(diameter * 0.55)), Styles.ball_ink(key))
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	node.add_child(value)
+	node.tooltip_text = "%s球 %d" % [Styles.COLOR_LABELS.get(key, key), count]
+	return node
+
+
 static func pill(text: String, color: Color, dim: bool = false) -> PanelContainer:
 	var node := panel(Styles.pill_box())
 	node.size_flags_vertical = Control.SIZE_SHRINK_CENTER

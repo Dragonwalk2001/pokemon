@@ -309,11 +309,12 @@ func _render_supply(supply: Dictionary) -> void:
 			tile.modulate = Color(1, 1, 1, 0.45)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 5)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		tile.add_child(row)
-		row.add_child(_dot(Styles.TOKEN_COLORS[key]))
-		row.add_child(_label(Styles.COLOR_LABELS[key], 12, Styles.COLOR_TEXT))
-		row.add_child(_spacer())
-		row.add_child(_label(str(count), 15, Styles.COLOR_TEXT))
+		row.add_child(_ball(key, count, 22))
+		var name_label := _label(Styles.COLOR_LABELS[key], 12, Styles.COLOR_TEXT)
+		name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(name_label)
 		supply_grid.add_child(tile)
 
 
@@ -398,11 +399,7 @@ func _build_player_panel(player: Dictionary, current_id: int, game_over: bool) -
 	var tokens: Dictionary = player.get("tokens", {})
 	for key in Styles.COLOR_KEYS:
 		var count := int(tokens.get(key, 0))
-		token_row.add_child(_pill(
-			"%s %d" % [Styles.COLOR_LABELS[key], count],
-			Styles.TOKEN_COLORS[key],
-			count == 0
-		))
+		token_row.add_child(_ball(key, count, 18, count == 0))
 
 	# 减免与统计。
 	var stats_row := HFlowContainer.new()
@@ -414,7 +411,7 @@ func _build_player_panel(player: Dictionary, current_id: int, game_over: bool) -
 	for key in ["red", "blue", "yellow", "pink", "black"]:
 		var count := int(bonuses.get(key, 0))
 		if count > 0:
-			stats_row.add_child(_pill(str(count), Styles.TOKEN_COLORS[key]))
+			stats_row.add_child(_ball(key, count, 18))
 	stats_row.add_child(_chip("捕捉 %d" % int(player.get("card_count", 0))))
 	stats_row.add_child(_chip("保留 %d / 3" % int(player.get("reserved_count", 0))))
 	stats_row.add_child(_chip("进化 %d" % int(player.get("evolution_count", 0))))
@@ -549,6 +546,23 @@ func _dot(color: Color) -> PanelContainer:
 	dot.custom_minimum_size = Vector2(8, 8)
 	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return dot
+
+
+## 编号精灵球：彩色圆球 + 球内数量（与卡面费用同一形式）。
+func _ball(key: String, count: int, diameter: int = 20, dim: bool = false) -> PanelContainer:
+	var ball := _panel(
+		Styles.ball_box(Styles.TOKEN_COLORS.get(key, Styles.COLOR_ACCENT), diameter)
+	)
+	ball.custom_minimum_size = Vector2(diameter, diameter)
+	ball.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if dim:
+		ball.modulate = Color(1, 1, 1, 0.4)
+	var value := _label(str(count), maxi(10, int(diameter * 0.55)), Styles.ball_ink(key))
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ball.add_child(value)
+	ball.tooltip_text = "%s球 %d" % [Styles.COLOR_LABELS.get(key, key), count]
+	return ball
 
 
 func _pill(text: String, color: Color, dim: bool = false) -> PanelContainer:

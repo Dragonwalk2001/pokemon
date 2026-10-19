@@ -24,7 +24,7 @@ game/
 ├── scripts/game/board_view.gd # 场上 5 行牌 + 选中抬起 + 可操作集合 + 键盘浏览
 ├── scripts/game/token_strip.gd# 精灵球堆：左键 +1 / 右键 −1
 ├── scripts/ui/styles.gd       # 色板与 StyleBoxFlat 工厂（与 HTML 回放同色）
-├── scripts/ui/widgets.gd      # 面板 / 药丸 / 徽章等小控件
+├── scripts/ui/widgets.gd      # 面板 / 编号球 / 药丸 / 徽章等小控件
 ├── theme/game_theme.tres      # SystemFont：中文走系统字体兜底
 └── icon.svg
 ```
@@ -72,6 +72,7 @@ game/
 
 界面尺寸：窗口 1440×900，最小 1180×760；`canvas_items` + `aspect=expand`。
 顶栏只放阶段、当前行动者与种子；开局参数在标题菜单的「新对局」里。
+视觉约定：精灵球一律画成编号球（彩色圆球 + 球内数字），用于卡面费用、进化需求、供应区、玩家持有与减免；卡牌胜利分是黄色方块，避免和精灵球混淆。
 
 ## 数据与私密信息
 
